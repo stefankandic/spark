@@ -625,6 +625,7 @@ class CodegenContext extends Logging {
     case dt: DataType if isPrimitiveType(dt) => s"$c1 == $c2"
     case dt: DataType if dt.isInstanceOf[AtomicType] => s"$c1.equals($c2)"
     case array: ArrayType => genComp(array, c1, c2) + " == 0"
+    case map: MapType => genComp(map, c1, c2) + " == 0"
     case struct: StructType => genComp(struct, c1, c2) + " == 0"
     case udt: UserDefinedType[_] => genEqual(udt.sqlType, c1, c2)
     case CalendarIntervalType => s"$c1.equals($c2)"
@@ -701,6 +702,68 @@ class CodegenContext extends Logging {
             }
             return 0;
           }
+        """
+      s"${addNewFunction(compareFunc, funcCode)}($c1, $c2)"
+    case map: MapType =>
+      val keyType = map.keyType
+      val valueType = map.valueType
+      val compareFunc = freshName("compareMap")
+      val funcCode: String =
+        s"""
+            public int $compareFunc(MapData a, MapData b) {
+              // when comparing unsafe maps, try equals first as it compares the binary directly
+              // which is very fast.
+              if (a instanceof UnsafeMapData && b instanceof UnsafeMapData && a.equals(b)) {
+                return 0;
+              }
+
+              int lengthA = a.numElements();
+              int lengthB = b.numElements();
+              if (lengthA < lengthB) {
+                  return -1;
+              } else if (lengthA > lengthB) {
+                  return 1;
+              }
+
+              ArrayData keysA = a.keyArray();
+              ArrayData keysB = b.keyArray();
+              ArrayData valuesA = a.valueArray();
+              ArrayData valuesB = b.valueArray();
+              for (int aIndex = 0; aIndex < lengthA; aIndex++) {
+                ${javaType(keyType)} keyA = ${getValue("keysA", keyType, "aIndex")};
+
+                int bIndex = 0;
+                for (; bIndex < lengthA; bIndex++) {
+                  if (${genEqual(keyType, "keyA", getValue("keysB", keyType, "bIndex"))}) {
+                    break;
+                  }
+                }
+
+                // key not found in b
+                if (bIndex == lengthA) {
+                    return 1;
+                }
+
+                boolean isNullA = valuesA.isNullAt(aIndex);
+                boolean isNullB = valuesB.isNullAt(bIndex);
+                if (isNullA && isNullB) {
+                  // Nothing
+                } else if (isNullA) {
+                  return -1;
+                } else if (isNullB) {
+                  return 1;
+                } else {
+                  ${javaType(valueType)} valueA = ${getValue("valuesA", valueType, "aIndex")};
+                  ${javaType(valueType)} valueB = ${getValue("valuesB", valueType, "bIndex")};
+                  int comp = ${genComp(valueType, "valueA", "valueB")};
+                  if (comp != 0) {
+                      return comp;
+                  }
+                }
+              }
+
+              return 0;
+            }
         """
       s"${addNewFunction(compareFunc, funcCode)}($c1, $c2)"
     case schema: StructType =>

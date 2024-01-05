@@ -2152,8 +2152,44 @@ class DataFrameAggregateSuite extends QueryTest
         assert(createAggregate(dfDifferent).count() == numRows)
       }
     }
+  }
 
-    def createAggregate(df: DataFrame): DataFrame = df.groupBy("c0").agg(count("*"))
+  test("SPARK-46536 Support GROUP BY MapType") {
+    val numRows = 50
+
+    val dfSame = (0 until numRows)
+      .map(_ => Tuple1(Map("" -> -0.0)))
+      .toDF("c0")
+
+    val dfDifferent = (0 until numRows)
+      .map(i => Tuple1(Map(i.toString -> i)))
+      .toDF("c0")
+
+    testAllAggregates {
+      assert(createAggregate(dfSame).count() == 1)
+      assert(createAggregate(dfDifferent).count() == numRows)
+    }
+  }
+
+  private def testAllAggregates(f: => Any): Unit = {
+    val configurations = Seq(
+      Seq.empty[(String, String)], // hash aggregate is used by default
+      Seq("spark.sql.test.forceApplyObjectHashAggregate" -> "true"),
+      Seq(
+        "spark.sql.test.forceApplyObjectHashAggregate" -> "true",
+        SQLConf.OBJECT_AGG_SORT_BASED_FALLBACK_THRESHOLD.key -> "1"),
+      Seq("spark.sql.test.forceApplySortAggregate" -> "true")
+    )
+
+    for (conf <- configurations) {
+      withSQLConf(conf: _*) {
+        f
+      }
+    }
+  }
+
+  private def createAggregate(df: DataFrame, colName: String = "c0"): DataFrame = {
+    df.groupBy(colName).agg(count("*"))
   }
 }
 
