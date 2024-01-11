@@ -305,6 +305,22 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
     }
   }
 
+  public byte[] getBytesNullTerm() {
+    if (offset == BYTE_ARRAY_OFFSET && base instanceof byte[] bytes
+      && bytes.length == numBytes) {
+      // create a copy with a null terminator
+      byte[] bytesNullTerm = new byte[numBytes + 1];
+      System.arraycopy(bytes, 0, bytesNullTerm, 0, numBytes);
+      bytesNullTerm[numBytes] = 0;
+      return bytesNullTerm;
+    } else {
+      byte[] bytesNullTerm = new byte[numBytes + 1];
+      copyMemory(base, offset, bytesNullTerm, BYTE_ARRAY_OFFSET, numBytes);
+      bytesNullTerm[numBytes] = 0;
+      return bytesNullTerm;
+    }
+  }
+
   /**
    * Returns a substring of this.
    * @param start the position of first code point
