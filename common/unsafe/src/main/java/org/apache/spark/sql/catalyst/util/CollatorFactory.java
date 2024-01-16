@@ -1,5 +1,6 @@
 package org.apache.spark.sql.catalyst.util;
 
+import com.ibm.icu.text.RuleBasedCollator;
 import org.apache.spark.unsafe.types.UTF8String;
 
 import java.util.ArrayList;
@@ -70,8 +71,7 @@ public class CollatorFactory {
       return collationNameToId.get(collationName);
     }
 
-//    var collator = getCollator(collationName);
-    var col = MyClass.createCollator(collationName);
+    var collator = (RuleBasedCollator) getCollator(collationName);
     var comparator = new Comparator<UTF8String>() {
       @Override
       public int compare(UTF8String o1, UTF8String o2) {
@@ -79,9 +79,15 @@ public class CollatorFactory {
         // Hence we do UTF8 -> UTF16 conversion here, which is very expensive.
         // ICU4c has direct UTF8 comparison. Solution is probably to use native library here.
 
-        return MyClass.compare2(col, o1.getBytes(), o2.getBytes());
-//        return MyClass.compare(col, o1.toString(), o2.toString());
-//        return collator.compare(o1.toString(), o2.toString());
+        try {
+//          System.out.println(o1 + " " + o2);
+          return collator.doCompare(o1.getBytes(), o2.getBytes());
+        } catch (Exception e) {
+          System.out.println("Failed for: " + o1 + " " + o2);
+          throw e;
+        }
+//          return collator.compare(o1.toString(), o2.toString());
+
       }
     };
 
