@@ -424,6 +424,7 @@ object DataType {
           leftFields.zip(rightFields).forall { case (l, r) =>
             l.name == r.name && equalsIgnoreNullability(l.dataType, r.dataType)
           }
+      case (l: StringType, r: StringType) => l == r || l.isDefaultCollation || r.isDefaultCollation
       case (l, r) => l == r
     }
   }
@@ -448,6 +449,7 @@ object DataType {
               equalsIgnoreCaseAndNullability(l.dataType, r.dataType)
           }
 
+      case (f: StringType, t: StringType) => f == t || f.isDefaultCollation || t.isDefaultCollation
       case (fromDataType, toDataType) => fromDataType == toDataType
     }
   }
