@@ -308,4 +308,25 @@ class CollationSuite extends QueryTest
       checkAnswer(sql(s"SELECT COUNT(DISTINCT c1) FROM $tableName"), Seq(Row(1)))
     }
   }
+
+
+  test("disable aggregate pushdown") {
+    withTempPath {dir =>
+    val tableName = "parquet_dummy_t3"
+    val collation = "'sr_ci_ai'"
+    withTable(tableName) {
+      spark.sql(
+        s"""
+           | CREATE TABLE $tableName(id INT, c1 STRING COLLATE $collation) USING PARQUET
+           | LOCATION '${dir.getAbsolutePath}'
+           | PARTITIONED BY (c1)
+           |""".stripMargin)
+      spark.sql(s"INSERT INTO $tableName VALUES (1, 'c')")
+      spark.sql(s"INSERT INTO $tableName VALUES (2, 'č')")
+
+      val df = sql(s"SELECT COUNT(*) FROM $tableName GROUP BY c1")
+      checkAnswer(df, Seq(Row(2)))
+    }
+    }
+  }
 }
