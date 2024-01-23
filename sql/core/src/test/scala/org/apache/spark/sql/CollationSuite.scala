@@ -335,4 +335,32 @@ class CollationSuite extends QueryTest
       }
     }
   }
+
+  test("cast default collated strings") {
+    val tableName = "parquet_dummy_t4"
+    withTable(tableName) {
+      spark.sql(
+        s"""
+           | CREATE TABLE $tableName(c1 STRING COLLATE 'SR_CI_AI',
+           | c2 STRING COLLATE 'SR_CI_AI') USING PARQUET
+           |""".stripMargin)
+      sql(s"INSERT INTO $tableName VALUES ('aaa', 'bbb')")
+      sql(s"INSERT INTO $tableName VALUES ('AAA', 'BBB')")
+
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'aaa'"),
+        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE 'aaa' = c1"),
+          Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = c2"),
+        Seq())
+
+      checkAnswer(sql(s"SELECT CASE WHEN c1 = 'aaa' THEN 'good' ELSE 'bad' END FROM $tableName"),
+        Seq(Row("good"), Row("good")))
+
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'a' || 'a' || 'a'"),
+        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = SUBSTR('aaaa', 0, 3)"),
+        Seq(Row("aaa"), Row("AAA")))
+    }
+  }
 }

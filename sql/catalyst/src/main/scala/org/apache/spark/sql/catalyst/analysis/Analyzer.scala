@@ -43,7 +43,7 @@ import org.apache.spark.sql.catalyst.trees.AlwaysProcess
 import org.apache.spark.sql.catalyst.trees.CurrentOrigin.withOrigin
 import org.apache.spark.sql.catalyst.trees.TreePattern._
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
-import org.apache.spark.sql.catalyst.util.{toPrettySQL, AUTO_GENERATED_ALIAS, CharVarcharUtils}
+import org.apache.spark.sql.catalyst.util.{toPrettySQL, AUTO_GENERATED_ALIAS, CharVarcharUtils, CollatorFactory}
 import org.apache.spark.sql.catalyst.util.ResolveDefaultColumns._
 import org.apache.spark.sql.connector.catalog.{View => _, _}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
@@ -326,6 +326,7 @@ class Analyzer(override val catalogManager: CatalogManager) extends RuleExecutor
       RewriteUpdateTable ::
       RewriteMergeIntoTable ::
       BindParameters ::
+      CollateDefaultCollatedString ::
       typeCoercionRules() ++
       Seq(
         ResolveWithCTE,
@@ -4096,6 +4097,61 @@ object RemoveTempResolvedColumn extends Rule[LogicalPlan] {
         } else {
           t.child
         }
+    }
+  }
+}
+
+/**
+ * This rule is applied on binary comparisons where one side is a string with a default
+ * collation and the other side is a string with a non-default (custom) collation.
+ * In such cases, it adjusts the collation of the default-collated string to match the
+ * non-default collation.
+ */
+object CollateDefaultCollatedString extends Rule[LogicalPlan] {
+  override def apply(plan: LogicalPlan): LogicalPlan = plan.resolveOperatorsUpWithPruning(
+    _.containsPattern(BINARY_COMPARISON), ruleId) {
+    case p: LogicalPlan => p.transformExpressionsUpWithPruning(
+      _.containsPattern(BINARY_COMPARISON), ruleId) {
+      case b @ BinaryComparison(left, right) if shouldApply(left, right) =>
+
+        val (customCollated, defaultCollated) = if (isCustomCollated(left)) {
+          (left, right)
+        } else {
+          (right, left)
+        }
+
+        val collationName = CollatorFactory
+          .getInfoForId(customCollated.dataType.asInstanceOf[StringType].collationId)
+          .collationName
+
+        // collate default one using the custom one's collation
+        val newlyCollated = Collate(defaultCollated, Literal.create(collationName, StringType))
+
+        if (customCollated == left) {
+          b.withNewChildren(Seq(left, newlyCollated))
+        } else {
+          b.withNewChildren(Seq(newlyCollated, right))
+        }
+    }
+  }
+
+  private def shouldApply(left: Expression, right: Expression): Boolean = {
+    if (!left.resolved || !right.resolved) {
+      return false
+    }
+
+    if (!left.dataType.isInstanceOf[StringType] || !right.dataType.isInstanceOf[StringType]) {
+      return false
+    }
+
+    // only apply if one side is custom collated
+    isCustomCollated(left) ^ isCustomCollated(right)
+  }
+
+  private def isCustomCollated(a: Expression): Boolean = {
+    a.dataType match {
+      case st: StringType => !st.isDefaultCollation
+      case _ => false
     }
   }
 }
