@@ -233,6 +233,8 @@ object Cast extends QueryErrorsBase {
     case (TimestampType, _: NumericType) => true
     case (_: NumericType, _: NumericType) => true
 
+    case (f: StringType, _: StringType) => f.isDefaultCollation
+
     case (ArrayType(fromType, fn), ArrayType(toType, tn)) =>
       canCast(fromType, toType) &&
         resolvableNullability(fn || forceNullable(fromType, toType), tn)
@@ -1107,7 +1109,7 @@ case class Cast(
     } else {
       to match {
         case dt if dt == from => identity[Any]
-        case _: StringType => castToString(from)
+        case toSt: StringType => castToString(from, toSt.collationId)
         case BinaryType => castToBinary(from)
         case DateType => castToDate(from)
         case decimal: DecimalType => castToDecimal(from, decimal)

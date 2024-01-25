@@ -50,121 +50,129 @@ trait ToStringBase { self: UnaryExpression with TimeZoneAwareExpression =>
   @inline private def acceptAny[T](func: T => Any): Any => Any = i => func(i.asInstanceOf[T])
 
   // Returns a function to convert a value to pretty string. The function assumes input is not null.
-  protected final def castToString(from: DataType): Any => Any = from match {
-    case CalendarIntervalType =>
-      acceptAny[CalendarInterval](i => UTF8String.fromString(i.toString))
-    case BinaryType if useHexFormatForBinary =>
-      acceptAny[Array[Byte]](binary => UTF8String.fromString(SparkStringUtils.getHexString(binary)))
-    case BinaryType =>
-      acceptAny[Array[Byte]](UTF8String.fromBytes)
-    case DateType =>
-      acceptAny[Int](d => UTF8String.fromString(dateFormatter.format(d)))
-    case TimestampType =>
-      acceptAny[Long](t => UTF8String.fromString(timestampFormatter.format(t)))
-    case TimestampNTZType =>
-      acceptAny[Long](t => UTF8String.fromString(timestampNTZFormatter.format(t)))
-    case ArrayType(et, _) =>
-      acceptAny[ArrayData](array => {
-        val builder = new UTF8StringBuilder
-        builder.append("[")
-        if (array.numElements() > 0) {
-          val toUTF8String = castToString(et)
-          if (array.isNullAt(0)) {
-            if (nullString.nonEmpty) builder.append(nullString)
-          } else {
-            builder.append(toUTF8String(array.get(0, et)).asInstanceOf[UTF8String])
-          }
-          var i = 1
-          while (i < array.numElements()) {
-            builder.append(",")
-            if (array.isNullAt(i)) {
-              if (nullString.nonEmpty) builder.append(" " + nullString)
+  protected final def castToString(
+      from: DataType,
+      toCollationId: Int = StringType.DEFAULT_COLLATION_ID): Any => Any =
+    from match {
+      case CalendarIntervalType =>
+        acceptAny[CalendarInterval](i => UTF8String.fromString(i.toString, toCollationId))
+      case BinaryType if useHexFormatForBinary =>
+        acceptAny[Array[Byte]](binary =>
+          UTF8String.fromString(SparkStringUtils.getHexString(binary), toCollationId))
+      case BinaryType =>
+        acceptAny[Array[Byte]](UTF8String.fromBytes)
+      case DateType =>
+        acceptAny[Int](d => UTF8String.fromString(dateFormatter.format(d), toCollationId))
+      case TimestampType =>
+        acceptAny[Long](t => UTF8String.fromString(timestampFormatter.format(t), toCollationId))
+      case TimestampNTZType =>
+        acceptAny[Long](t =>
+          UTF8String.fromString(timestampNTZFormatter.format(t), toCollationId))
+      case ArrayType(et, _) =>
+        acceptAny[ArrayData](array => {
+          val builder = new UTF8StringBuilder
+          builder.append("[")
+          if (array.numElements() > 0) {
+            val toUTF8String = castToString(et, toCollationId)
+            if (array.isNullAt(0)) {
+              if (nullString.nonEmpty) builder.append(nullString)
             } else {
-              builder.append(" ")
-              builder.append(toUTF8String(array.get(i, et)).asInstanceOf[UTF8String])
+              builder.append(toUTF8String(array.get(0, et)).asInstanceOf[UTF8String])
             }
-            i += 1
+            var i = 1
+            while (i < array.numElements()) {
+              builder.append(",")
+              if (array.isNullAt(i)) {
+                if (nullString.nonEmpty) builder.append(" " + nullString)
+              } else {
+                builder.append(" ")
+                builder.append(toUTF8String(array.get(i, et)).asInstanceOf[UTF8String])
+              }
+              i += 1
+            }
           }
-        }
-        builder.append("]")
-        builder.build()
-      })
-    case MapType(kt, vt, _) =>
-      acceptAny[MapData](map => {
-        val builder = new UTF8StringBuilder
-        builder.append(leftBracket)
-        if (map.numElements() > 0) {
-          val keyArray = map.keyArray()
-          val valueArray = map.valueArray()
-          val keyToUTF8String = castToString(kt)
-          val valueToUTF8String = castToString(vt)
-          builder.append(keyToUTF8String(keyArray.get(0, kt)).asInstanceOf[UTF8String])
-          builder.append(" ->")
-          if (valueArray.isNullAt(0)) {
-            if (nullString.nonEmpty) builder.append(" " + nullString)
-          } else {
-            builder.append(" ")
-            builder.append(valueToUTF8String(valueArray.get(0, vt)).asInstanceOf[UTF8String])
-          }
-          var i = 1
-          while (i < map.numElements()) {
-            builder.append(", ")
-            builder.append(keyToUTF8String(keyArray.get(i, kt)).asInstanceOf[UTF8String])
+          builder.append("]")
+          builder.build()
+        })
+      case MapType(kt, vt, _) =>
+        acceptAny[MapData](map => {
+          val builder = new UTF8StringBuilder
+          builder.append(leftBracket)
+          if (map.numElements() > 0) {
+            val keyArray = map.keyArray()
+            val valueArray = map.valueArray()
+            val keyToUTF8String = castToString(kt, toCollationId)
+            val valueToUTF8String = castToString(vt, toCollationId)
+            builder.append(keyToUTF8String(keyArray.get(0, kt)).asInstanceOf[UTF8String])
             builder.append(" ->")
-            if (valueArray.isNullAt(i)) {
+            if (valueArray.isNullAt(0)) {
               if (nullString.nonEmpty) builder.append(" " + nullString)
             } else {
               builder.append(" ")
-              builder.append(valueToUTF8String(valueArray.get(i, vt))
-                .asInstanceOf[UTF8String])
+              builder.append(valueToUTF8String(valueArray.get(0, vt)).asInstanceOf[UTF8String])
             }
-            i += 1
+            var i = 1
+            while (i < map.numElements()) {
+              builder.append(", ")
+              builder.append(keyToUTF8String(keyArray.get(i, kt)).asInstanceOf[UTF8String])
+              builder.append(" ->")
+              if (valueArray.isNullAt(i)) {
+                if (nullString.nonEmpty) builder.append(" " + nullString)
+              } else {
+                builder.append(" ")
+                builder.append(valueToUTF8String(valueArray.get(i, vt))
+                  .asInstanceOf[UTF8String])
+              }
+              i += 1
+            }
           }
-        }
-        builder.append(rightBracket)
-        builder.build()
-      })
-    case StructType(fields) =>
-      acceptAny[InternalRow](row => {
-        val builder = new UTF8StringBuilder
-        builder.append(leftBracket)
-        if (row.numFields > 0) {
-          val st = fields.map(_.dataType)
-          val toUTF8StringFuncs = st.map(castToString)
-          if (row.isNullAt(0)) {
-            if (nullString.nonEmpty) builder.append(nullString)
-          } else {
-            builder.append(toUTF8StringFuncs(0)(row.get(0, st(0))).asInstanceOf[UTF8String])
-          }
-          var i = 1
-          while (i < row.numFields) {
-            builder.append(",")
-            if (row.isNullAt(i)) {
-              if (nullString.nonEmpty) builder.append(" " + nullString)
+          builder.append(rightBracket)
+          builder.build()
+        })
+      case StructType(fields) =>
+        acceptAny[InternalRow](row => {
+          val builder = new UTF8StringBuilder
+          builder.append(leftBracket)
+          if (row.numFields > 0) {
+            val st = fields.map(_.dataType)
+            val toUTF8StringFuncs = st.map(dt => castToString(dt, toCollationId))
+            if (row.isNullAt(0)) {
+              if (nullString.nonEmpty) builder.append(nullString)
             } else {
-              builder.append(" ")
-              builder.append(toUTF8StringFuncs(i)(row.get(i, st(i))).asInstanceOf[UTF8String])
+              builder.append(toUTF8StringFuncs(0)(row.get(0, st(0))).asInstanceOf[UTF8String])
             }
-            i += 1
+            var i = 1
+            while (i < row.numFields) {
+              builder.append(",")
+              if (row.isNullAt(i)) {
+                if (nullString.nonEmpty) builder.append(" " + nullString)
+              } else {
+                builder.append(" ")
+                builder.append(toUTF8StringFuncs(i)(row.get(i, st(i))).asInstanceOf[UTF8String])
+              }
+              i += 1
+            }
           }
-        }
-        builder.append(rightBracket)
-        builder.build()
-      })
-    case pudt: PythonUserDefinedType => castToString(pudt.sqlType)
-    case udt: UserDefinedType[_] =>
-      o => UTF8String.fromString(udt.deserialize(o).toString)
-    case YearMonthIntervalType(startField, endField) =>
-      acceptAny[Int](i => UTF8String.fromString(
-        IntervalUtils.toYearMonthIntervalString(i, ANSI_STYLE, startField, endField)))
-    case DayTimeIntervalType(startField, endField) =>
-      acceptAny[Long](i => UTF8String.fromString(
-        IntervalUtils.toDayTimeIntervalString(i, ANSI_STYLE, startField, endField)))
-    case _: DecimalType if useDecimalPlainString =>
-      acceptAny[Decimal](d => UTF8String.fromString(d.toPlainString))
-    case _: StringType => identity
-    case _ => o => UTF8String.fromString(o.toString)
-  }
+          builder.append(rightBracket)
+          builder.build()
+        })
+      case pudt: PythonUserDefinedType => castToString(pudt.sqlType, toCollationId)
+      case udt: UserDefinedType[_] =>
+        o => UTF8String.fromString(udt.deserialize(o).toString, toCollationId)
+      case YearMonthIntervalType(startField, endField) =>
+        acceptAny[Int](i =>
+          UTF8String.fromString(
+            IntervalUtils.toYearMonthIntervalString(i, ANSI_STYLE, startField, endField),
+            toCollationId))
+      case DayTimeIntervalType(startField, endField) =>
+        acceptAny[Long](i =>
+          UTF8String.fromString(
+            IntervalUtils.toDayTimeIntervalString(i, ANSI_STYLE, startField, endField),
+            toCollationId))
+      case _: DecimalType if useDecimalPlainString =>
+        acceptAny[Decimal](d => UTF8String.fromString(d.toPlainString, toCollationId))
+      case _ => o => UTF8String.fromString(o.toString, toCollationId)
+    }
 
   // Returns a function to generate code to convert a value to pretty string. It assumes the input
   // is not null.
