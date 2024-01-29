@@ -19,13 +19,13 @@ package org.apache.spark.sql.execution.datasources
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, GenericInternalRow}
-import org.apache.spark.sql.connector.expressions.{Expression => V2Expression, FieldReference}
+import org.apache.spark.sql.connector.expressions.{FieldReference, Expression => V2Expression}
 import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, Aggregation, Count, CountStar, Max, Min}
 import org.apache.spark.sql.execution.RowToColumnConverter
 import org.apache.spark.sql.execution.datasources.v2.V2ColumnUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector}
-import org.apache.spark.sql.types.{BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StructField, StructType}
-import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
+import org.apache.spark.sql.types.{BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, StructField, StructType}
+import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 
 /**
  * Utility class for aggregate push down to Parquet and ORC.
@@ -49,6 +49,14 @@ object AggregatePushDownUtils {
 
     def isPartitionCol(colName: String) = {
       partitionNames.contains(colName)
+    }
+
+    def isNonDefaultCollatedStringType(colName: String) = {
+      val structField = getStructFieldForCol(colName)
+      structField.dataType match {
+        case st: StringType => !st.isDefaultCollation
+        case _ => false
+      }
     }
 
     def processMinOrMax(agg: AggregateFunc): Boolean = {
@@ -111,6 +119,10 @@ object AggregatePushDownUtils {
       // don't push down if the group by columns are not the same as the partition columns (orders
       // doesn't matter because reorder can be done at data source layer)
       if (colName.isEmpty || !isPartitionCol(colName.get)) return None
+
+      // don't push down if the group by column is non-default collated string type
+      if (isNonDefaultCollatedStringType(colName.get)) return None
+
       finalSchema = finalSchema.add(getStructFieldForCol(colName.get))
     }
 

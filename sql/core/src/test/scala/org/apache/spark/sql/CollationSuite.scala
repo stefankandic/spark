@@ -18,6 +18,7 @@
 package org.apache.spark.sql
 
 import org.apache.spark.sql.catalyst.util.CollatorFactory
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.test.SharedSparkSession
 import org.apache.spark.sql.types.StringType
 
@@ -332,6 +333,29 @@ class CollationSuite extends QueryTest
         val df = sql(s"SELECT * FROM $tableName WHERE c1 ${filter._1} collate('aaa', $collation)")
         assert(df.queryExecution.toString().contains("PushedFilters: []"))
         checkAnswer(df, filter._2)
+      }
+    }
+  }
+
+  test("disable agg push down for collated strings in group by") {
+    val tableName = "parquet_dummy_agg_pushdown"
+    withSQLConf(SQLConf.PARQUET_AGGREGATE_PUSHDOWN_ENABLED.key -> "true") {
+      withTable(tableName) {
+        spark.sql(
+          s"""
+             | CREATE TABLE $tableName(id INT, c1 STRING COLLATE 'SR_CI_AI') USING PARQUET
+             |""".stripMargin)
+        spark.sql(s"INSERT INTO $tableName VALUES (1, 'ccc')")
+        spark.sql(s"INSERT INTO $tableName VALUES (2, 'ććć')")
+        spark.sql(s"INSERT INTO $tableName VALUES (3, 'ččč')")
+
+        var df = sql(s"SELECT COUNT(*) FROM $tableName GROUP BY c1")
+//        assert(df.queryExecution.toString().contains("PushedAggregation: []"))
+        checkAnswer(df, Seq(Row(3)))
+
+//        df = sql(s"SELECT MIN(id), MAX(id) FROM $tableName GROUP BY c1")
+//        assert(df.queryExecution.toString().contains("PushedAggregation: []"))
+//        checkAnswer(df, Seq(Row(1, 3)))
       }
     }
   }

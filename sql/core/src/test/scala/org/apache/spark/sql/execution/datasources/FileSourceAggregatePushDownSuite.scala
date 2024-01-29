@@ -528,6 +528,34 @@ trait FileSourceAggregatePushDownSuite
     }
   }
 
+  test("disable agg push down for collated strings in group by") {
+    withSQLConf(aggPushDownEnabledKey -> "true") {
+      withTempPath { dir =>
+        val inp = sql(
+          """
+            SELECT id, collate(c, 'SR_CI_AI') as c FROM VALUES
+            (1, 'ććć'), (2, 'ččč'), (3, 'ccc')
+            as data(id, c)
+          """)
+
+        inp.write.partitionBy("c").format(format).save(dir.getCanonicalPath)
+
+        withTempView("tmp") {
+          spark.read.schema(inp.schema).format(format).load(dir.getCanonicalPath)
+            .createOrReplaceTempView("tmp")
+
+          var selectAgg = sql("SELECT COUNT(*) FROM tmp GROUP BY c")
+          checkPushedInfo(selectAgg, "PushedAggregation: []")
+          checkAnswer(selectAgg, Seq(Row(3)))
+
+          selectAgg = sql("SELECT MIN(id), MAX(id) FROM tmp GROUP BY c")
+          checkPushedInfo(selectAgg, "PushedAggregation: []")
+          checkAnswer(selectAgg, Seq(Row(1, 3)))
+        }
+      }
+    }
+  }
+
   private def checkPushedInfo(df: DataFrame, expectedPlanFragment: String): Unit = {
     df.queryExecution.optimizedPlan.collect {
       case _: DataSourceV2ScanRelation =>
