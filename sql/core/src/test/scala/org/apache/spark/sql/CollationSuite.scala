@@ -393,22 +393,27 @@ class CollationSuite extends QueryTest
   }
 
   test("compare strings of different non default collation") {
-    val tableName = "parquet_dummy"
+    val tableName = "parquet_dummy_diff_collation"
     withTable(tableName) {
       spark.sql(
         s"""
            | CREATE TABLE $tableName(c1 STRING COLLATE 'SR_CS_AS',
            | c2 STRING COLLATE 'SR_CI_AI') USING PARQUET
            |""".stripMargin)
-      sql(s"INSERT INTO $tableName VALUES ('aaa', 'aaa', 'aaa')")
-      sql(s"INSERT INTO $tableName VALUES ('AAA', 'AAA', 'AAA')")
+      sql(s"INSERT INTO $tableName VALUES ('aaa', 'aaa')")
+      sql(s"INSERT INTO $tableName VALUES ('AAA', 'AAA')")
 
-      val exception = intercept[AnalysisException] {
-        sql(s"SELECT c1 FROM $tableName WHERE c1 = c2")
-      }
-
-      assert(exception.getMessage.contains("left and right operands of the binary operator " +
-        "have incompatible types"))
+      checkError(
+        exception = intercept[AnalysisException] {
+          sql(s"SELECT c1 FROM $tableName WHERE c1 = c2")
+        },
+        errorClass = "DATATYPE_MISMATCH.BINARY_OP_DIFF_TYPES",
+        parameters = Map(
+          "left" -> "\"STRING(SR_CS_AS)\"",
+          "right" -> "\"STRING(SR_CI_AI)\"",
+          "sqlExpr" -> "\"(c1 = c2)\""),
+        queryContext = Array(ExpectedContext("", "", 50, 56, "c1 = c2"))
+      )
     }
   }
 }
