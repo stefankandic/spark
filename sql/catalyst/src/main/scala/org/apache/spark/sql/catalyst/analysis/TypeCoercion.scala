@@ -29,6 +29,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.trees.AlwaysProcess
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
+import org.apache.spark.sql.catalyst.util.CollatorFactory
 import org.apache.spark.sql.errors.QueryCompilationErrors
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
@@ -689,9 +690,37 @@ abstract class TypeCoercionBase {
       }
     }
 
+    private def shouldCollateLiteral(left: Expression, right: Expression): Boolean = {
+      val otherOperandDataType = (left, right) match {
+        case (Literal(_, StringType), _) => right.dataType
+        case (_, Literal(_, StringType)) => left.dataType
+        case _ => null
+      }
+
+      otherOperandDataType match {
+        case st: StringType => !st.isDefaultCollation
+        case _ => false
+      }
+    }
+
     override val transform: PartialFunction[Expression, Expression] = {
       // Skip nodes who's children have not been resolved yet.
       case e if !e.childrenResolved => e
+
+      case b @ BinaryOperator(left, right)
+          if shouldCollateLiteral(left, right) =>
+        val isLeftSideLiteral = left.isInstanceOf[Literal]
+        val (literal, otherOperand) = if (isLeftSideLiteral) (left, right) else (right, left)
+        val collationId = otherOperand.dataType match {
+          case st: StringType => st.collationId
+        }
+        val targetCollation = CollatorFactory.getInfoForId(collationId).collationName
+        val collatedLiteral = Collate(literal, Literal.create(targetCollation, StringType))
+        if (isLeftSideLiteral) {
+          b.withNewChildren(Seq(collatedLiteral, otherOperand))
+        } else {
+          b.withNewChildren(Seq(otherOperand, collatedLiteral))
+        }
 
       case b @ BinaryOperator(left, right)
           if canHandleTypeCoercion(left.dataType, right.dataType) =>

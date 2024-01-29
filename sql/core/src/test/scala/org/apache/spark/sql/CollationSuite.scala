@@ -337,7 +337,7 @@ class CollationSuite extends QueryTest
   }
 
   test("implicit cast of default collated strings") {
-    val tableName = "parquet_dummy_implicit_cast_t2"
+    val tableName = "parquet_dummy_implicit_cast_t22"
     withTable(tableName) {
       spark.sql(
         s"""
@@ -347,23 +347,24 @@ class CollationSuite extends QueryTest
       sql(s"INSERT INTO $tableName VALUES ('aaa', 'aaa', 'aaa')")
       sql(s"INSERT INTO $tableName VALUES ('AAA', 'AAA', 'aaa')")
 
-//      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'aaa'"),
-//        Seq(Row("aaa"), Row("AAA")))
-//      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = c3"),
-//        Seq(Row("aaa"), Row("AAA")))
-      //TODO: why does this fail
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'aaa'"),
+        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = c3"),
+        Seq(Row("aaa"), Row("AAA")))
       checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE 'aaa' = c1"),
           Seq(Row("aaa"), Row("AAA")))
-//      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = c2"),
-//        Seq(Row("aaa"), Row("AAA")))
-//
-//      checkAnswer(sql(s"SELECT CASE WHEN c1 = 'aaa' THEN 'good' ELSE 'bad' END FROM $tableName"),
-//        Seq(Row("good"), Row("good")))
-//
-//      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'a' || 'a' || 'a'"),
-//        Seq(Row("aaa"), Row("AAA")))
-//      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = SUBSTR('aaaa', 0, 3)"),
-//        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = c2"),
+        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 || 'a' = c2 || 'a'"),
+        Seq(Row("aaa"), Row("AAA")))
+
+      checkAnswer(sql(s"SELECT CASE WHEN c1 = 'aaa' THEN 'good' ELSE 'bad' END FROM $tableName"),
+        Seq(Row("good"), Row("good")))
+
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = 'a' || 'a' || 'a'"),
+        Seq(Row("aaa"), Row("AAA")))
+      checkAnswer(sql(s"SELECT c1 FROM $tableName WHERE c1 = SUBSTR('aaaa', 0, 3)"),
+        Seq(Row("aaa"), Row("AAA")))
     }
   }
 
@@ -397,7 +398,7 @@ class CollationSuite extends QueryTest
       spark.sql(
         s"""
            | CREATE TABLE $tableName(c1 STRING COLLATE 'SR_CS_AS',
-           | c2 STRING COLLATE 'SR_CI_AI', c3 STRING) USING PARQUET
+           | c2 STRING COLLATE 'SR_CI_AI') USING PARQUET
            |""".stripMargin)
       sql(s"INSERT INTO $tableName VALUES ('aaa', 'aaa', 'aaa')")
       sql(s"INSERT INTO $tableName VALUES ('AAA', 'AAA', 'AAA')")

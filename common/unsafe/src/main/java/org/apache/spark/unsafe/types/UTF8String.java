@@ -1742,7 +1742,6 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
   @Override
   public void writeExternal(ObjectOutput out) throws IOException {
     byte[] bytes = getBytes();
-//    out.writeInt(comparatorId);
     out.writeInt(bytes.length);
     out.write(bytes);
   }
@@ -1750,7 +1749,6 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
   @Override
   public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
     offset = BYTE_ARRAY_OFFSET;
-//    comparatorId = in.readInt();
     numBytes = in.readInt();
     base = new byte[numBytes];
     in.readFully((byte[]) base);
@@ -1759,7 +1757,6 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
   @Override
   public void write(Kryo kryo, Output out) {
     byte[] bytes = getBytes();
-//    out.writeInt(comparatorId);
     out.writeInt(bytes.length);
     out.write(bytes);
   }
@@ -1767,7 +1764,6 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
   @Override
   public void read(Kryo kryo, Input in) {
     this.offset = BYTE_ARRAY_OFFSET;
-//    this.comparatorId = in.readInt();
     this.numBytes = in.readInt();
     this.base = new byte[numBytes];
     in.read((byte[]) base);
