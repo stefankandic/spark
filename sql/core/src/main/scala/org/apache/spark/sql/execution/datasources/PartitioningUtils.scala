@@ -562,16 +562,22 @@ object PartitioningUtils extends SQLConfHelper {
 
     SchemaUtils.checkColumnNameDuplication(partitionColumns, caseSensitive)
 
-    partitionColumnsSchema(schema, partitionColumns).foreach {
-      field => field.dataType match {
-        case _: AtomicType => // OK
-        case _ => throw QueryCompilationErrors.cannotUseDataTypeForPartitionColumnError(field)
+    partitionColumnsSchema(schema, partitionColumns).foreach { field =>
+      if (!canPartitionOn(field.dataType)) {
+        throw QueryCompilationErrors.cannotUseDataTypeForPartitionColumnError(field)
       }
     }
 
     if (partitionColumns.nonEmpty && partitionColumns.size == schema.fields.length) {
       throw QueryCompilationErrors.cannotUseAllColumnsForPartitionColumnsError()
     }
+  }
+
+  def canPartitionOn(dataType: DataType): Boolean = dataType match {
+    // VariantType values are not comparable, so can't be used as partition columns.
+    case VariantType => false
+    case st: StringType => st.isDefaultCollation
+    case _ => true
   }
 
   def partitionColumnsSchema(
