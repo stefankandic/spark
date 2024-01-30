@@ -329,10 +329,11 @@ case class PreprocessTableCreation(catalog: SessionCatalog) extends Rule[Logical
         messageParameters = Map.empty)
     }
 
-    schema.filter(f => normalizedPartitionCols.contains(f.name)).map(_.dataType)
-      .foreach { dataType =>
-        if (!PartitioningUtils.canPartitionOn(dataType)) {
-          failAnalysis(s"Cannot use ${dataType.catalogString} for partition column")
+    schema
+      .filter(f => normalizedPartitionCols.contains(f.name))
+      .foreach { field =>
+        if (!PartitioningUtils.canPartitionOn(field.dataType)) {
+          failAnalysis(s"Cannot use ${field.dataType.catalogString} for partition column")
         }
       }
 
