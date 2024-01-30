@@ -573,6 +573,9 @@ object PartitioningUtils extends SQLConfHelper {
     }
   }
 
+  /**
+   * Checks whether a given data type can be used as a partition column.
+   */
   def canPartitionOn(dataType: DataType): Boolean = dataType match {
     // VariantType values are not comparable, so can't be used as partition columns.
     case VariantType => false
