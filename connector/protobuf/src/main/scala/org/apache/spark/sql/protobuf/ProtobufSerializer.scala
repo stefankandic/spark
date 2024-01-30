@@ -106,11 +106,11 @@ private[sql] class ProtobufSerializer(
         (getter, ordinal) => getter.getFloat(ordinal)
       case (DoubleType, DOUBLE) =>
         (getter, ordinal) => getter.getDouble(ordinal)
-      case (StringType, ENUM) =>
+      case (st: StringType, ENUM) =>
         val enumSymbols: Set[String] =
           fieldDescriptor.getEnumType.getValues.asScala.map(e => e.toString).toSet
         (getter, ordinal) =>
-          val data = getter.getUTF8String(ordinal).toString
+          val data = getter.getUTF8String(ordinal, st.collationId).toString
           if (!enumSymbols.contains(data)) {
             throw QueryExecutionErrors.cannotConvertCatalystValueToProtobufEnumTypeError(
               catalystPath,
@@ -132,9 +132,9 @@ private[sql] class ProtobufSerializer(
               enumValues.mkString(", "))
           }
           fieldDescriptor.getEnumType.findValueByNumber(data)
-      case (StringType, STRING) =>
+      case (st: StringType, STRING) =>
         (getter, ordinal) => {
-          String.valueOf(getter.getUTF8String(ordinal))
+          String.valueOf(getter.getUTF8String(ordinal, st.collationId))
         }
 
       case (BinaryType, BYTE_STRING) =>

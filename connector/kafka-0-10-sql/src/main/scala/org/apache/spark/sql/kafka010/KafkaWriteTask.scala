@@ -28,7 +28,7 @@ import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Cast, UnsafeProjection}
 import org.apache.spark.sql.kafka010.producer.{CachedKafkaProducer, InternalKafkaProducerPool}
-import org.apache.spark.sql.types.BinaryType
+import org.apache.spark.sql.types.{BinaryType, StringType}
 
 /**
  * Writes out data in a single Spark task, without any concerns about how
@@ -91,7 +91,7 @@ private[kafka010] abstract class KafkaRowWriter(
   protected def sendRow(
       row: InternalRow, producer: KafkaProducer[Array[Byte], Array[Byte]]): Unit = {
     val projectedRow = projection(row)
-    val topic = projectedRow.getUTF8String(0)
+    val topic = projectedRow.getUTF8String(0, StringType.DEFAULT_COLLATION_ID)
     val key = projectedRow.getBinary(1)
     val value = projectedRow.getBinary(2)
     if (topic == null) {
@@ -106,7 +106,9 @@ private[kafka010] abstract class KafkaRowWriter(
       val headerArray = projectedRow.getArray(3)
       val headers = (0 until headerArray.numElements()).map { i =>
         val struct = headerArray.getStruct(i, 2)
-        new RecordHeader(struct.getUTF8String(0).toString, struct.getBinary(1))
+        new RecordHeader(
+          struct.getUTF8String(0, StringType.DEFAULT_COLLATION_ID).toString,
+          struct.getBinary(1))
           .asInstanceOf[Header]
       }
       new ProducerRecord[Array[Byte], Array[Byte]](
