@@ -50,9 +50,7 @@ trait ToStringBase { self: UnaryExpression with TimeZoneAwareExpression =>
   @inline private def acceptAny[T](func: T => Any): Any => Any = i => func(i.asInstanceOf[T])
 
   // Returns a function to convert a value to pretty string. The function assumes input is not null.
-  protected final def castToString(
-      from: DataType,
-      toCollationId: Int = StringType.DEFAULT_COLLATION_ID): Any => Any = from match {
+  protected final def castToString(from: DataType, toCollationId: Int): Any => Any = from match {
     case CalendarIntervalType =>
       acceptAny[CalendarInterval](i => UTF8String.fromString(i.toString))
     case BinaryType if useHexFormatForBinary =>

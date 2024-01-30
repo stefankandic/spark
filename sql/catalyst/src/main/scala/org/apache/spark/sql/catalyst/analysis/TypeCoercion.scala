@@ -690,15 +690,12 @@ abstract class TypeCoercionBase {
       }
     }
 
-    private def shouldCollateLiteral(left: Expression, right: Expression): Boolean = {
-      val otherOperandDataType = (left, right) match {
-        case (Literal(_, StringType), _) => right.dataType
-        case (_, Literal(_, StringType)) => left.dataType
-        case _ => null
-      }
-
-      otherOperandDataType match {
-        case st: StringType => !st.isDefaultCollation
+    /**
+     * Checks if collation should be applied to a one side of a binary comparison.
+     */
+    private def shouldCollate(op: BinaryComparison): Boolean = {
+      (op.left.dataType, op.right.dataType) match {
+        case (lt: StringType, rt: StringType) => lt.isDefaultCollation ^ rt.isDefaultCollation
         case _ => false
       }
     }
@@ -707,19 +704,24 @@ abstract class TypeCoercionBase {
       // Skip nodes who's children have not been resolved yet.
       case e if !e.childrenResolved => e
 
-      case b @ BinaryOperator(left, right)
-          if shouldCollateLiteral(left, right) =>
-        val isLeftSideLiteral = left.isInstanceOf[Literal]
-        val (literal, otherOperand) = if (isLeftSideLiteral) (left, right) else (right, left)
-        val collationId = otherOperand.dataType match {
-          case st: StringType => st.collationId
-        }
+      case b @ BinaryComparison(left, right)
+          if shouldCollate(b) =>
+        val isLeftSideDefaultCollated = left.dataType.asInstanceOf[StringType].isDefaultCollation
+        val (defaultCollated, nonDefaultCollated) =
+          if (isLeftSideDefaultCollated) {
+            (left, right)
+          } else {
+            (right, left)
+          }
+
+        val collationId = nonDefaultCollated.dataType.asInstanceOf[StringType].collationId
         val targetCollation = CollatorFactory.getInfoForId(collationId).collationName
-        val collatedLiteral = Collate(literal, Literal.create(targetCollation, StringType))
-        if (isLeftSideLiteral) {
-          b.withNewChildren(Seq(collatedLiteral, otherOperand))
+
+        val newChild = Collate(defaultCollated, Literal.create(targetCollation, StringType))
+        if (isLeftSideDefaultCollated) {
+          b.withNewChildren(Seq(newChild, nonDefaultCollated))
         } else {
-          b.withNewChildren(Seq(otherOperand, collatedLiteral))
+          b.withNewChildren(Seq(nonDefaultCollated, newChild))
         }
 
       case b @ BinaryOperator(left, right)
@@ -914,15 +916,6 @@ object TypeCoercion extends TypeCoercionBase {
         Some(DayTimeIntervalType(t1.startField.min(t2.startField), t1.endField.max(t2.endField)))
       case (t1: YearMonthIntervalType, t2: YearMonthIntervalType) =>
         Some(YearMonthIntervalType(t1.startField.min(t2.startField), t1.endField.max(t2.endField)))
-
-      case (t1: StringType, t2: StringType) =>
-        if (!t1.isDefaultCollation && !t2.isDefaultCollation) {
-          None
-        } else if (t1.isDefaultCollation) {
-          Some(t2)
-        } else {
-          Some(t1)
-        }
 
       case (t1, t2) => findTypeForComplex(t1, t2, findTightestCommonType)
   }
