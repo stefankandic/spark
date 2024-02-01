@@ -2239,8 +2239,8 @@ abstract class ParquetFilterSuite extends QueryTest with ParquetTest with Shared
         val readback = spark.read.parquet(path.getAbsolutePath)
           .where(s"c1 ${filter._1} collate('aaa', $collation)")
           .where(s"ns.f1.f2 ${filter._1} collate('aaa', $collation)")
-          .where(
-            s"ns == named_struct('f1', named_struct('f2', collate(c1, $collation), 'f3', 1))")
+          .where(s"ns ${filter._1} " +
+            s"named_struct('f1', named_struct('f2', collate('aaa', $collation), 'f3', 1))")
           .select("c1")
 
         containsFilters(readback,
