@@ -38,7 +38,7 @@ import org.apache.spark.sql.execution.datasources.v2.{DataSourceV2Utils, FileDat
 import org.apache.spark.sql.execution.datasources.xml.XmlUtils.checkXmlSchema
 import org.apache.spark.sql.execution.streaming.StreamingRelation
 import org.apache.spark.sql.sources.StreamSourceProvider
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
 /**
@@ -170,7 +170,7 @@ final class DataStreamReader private[sql](sparkSession: SparkSession) extends Lo
       case _: StreamSourceProvider => Some(StreamingRelation(v1DataSource))
       case _ => None
     }
-    ds match {
+    val dataFrame = ds match {
       // file source v2 does not support streaming yet.
       case provider: TableProvider if !provider.isInstanceOf[FileDataSourceV2] =>
         val sessionOptions = DataSourceV2Utils.extractSessionConfigs(
@@ -197,6 +197,25 @@ final class DataStreamReader private[sql](sparkSession: SparkSession) extends Lo
       case _ =>
         // Code path for data source v1.
         Dataset.ofRows(sparkSession, StreamingRelation(v1DataSource))
+    }
+
+    checkSchema(dataFrame.schema)
+    dataFrame
+  }
+
+  private def checkSchema(schema: StructType): Unit = {
+    def canStreamFieldType(field: StructField): Boolean = {
+      field.dataType match {
+        case st: StringType => st.isDefaultCollation
+        case struct: StructType => struct.fields.forall(canStreamFieldType)
+        case _ => true
+      }
+    }
+
+    schema.fields.foreach { field =>
+      if (!canStreamFieldType(field)) {
+        throw new Exception(s"${field.name} ++++ ${field.dataType}")
+      }
     }
   }
 

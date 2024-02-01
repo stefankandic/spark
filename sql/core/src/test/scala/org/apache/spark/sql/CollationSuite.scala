@@ -19,7 +19,7 @@ package org.apache.spark.sql
 
 import org.apache.spark.sql.catalyst.util.CollatorFactory
 import org.apache.spark.sql.test.SharedSparkSession
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 
 class CollationSuite extends QueryTest
   with SharedSparkSession {
@@ -301,7 +301,7 @@ class CollationSuite extends QueryTest
     // TODO: Filter pushdown and partitioning are todos.
     val tableName = "parquet_dummy_t"
     withTable(tableName) {
-      sql(s"CREATE TABLE IF NOT EXISTS $tableName (c1 STRING COLLATE 'SR_CI_AI') USING PARQUET")
+      sql(s"CREATE TABLE IF NOT EXISTS $tableName (c1 STRING COLLATE 'SR_CI_AI') USING DELTA")
       sql(s"INSERT INTO $tableName VALUES ('aaa')")
       sql(s"INSERT INTO $tableName VALUES ('AAA')")
       checkAnswer(sql(s"SELECT DISTINCT collation(c1) FROM $tableName"), Seq(Row("SR_CI_AI")))
@@ -333,4 +333,51 @@ class CollationSuite extends QueryTest
       }
     }
   }
+
+  test("disable streaming on collated columns") {
+    val tableName = "streaming_dummy"
+    withTable(tableName) {
+      sql(
+        """
+          |SELECT id, st, struct(collate(st, 'SR_CI_AI')) as c1
+          |FROM VALUES (1, 'aaa')
+          |as data(id, st)
+          |""".stripMargin).write.mode("overwrite").parquet(s"~/tmp/$tableName")
+
+      val collId = CollatorFactory.getInstance().collationNameToId("SR_CI_AI")
+      val schema = StructType(Seq(
+        StructField("id", IntegerType),
+        StructField("c1", StructType(Seq(StructField("st", StringType(collId)))))
+//        StructField("c1", StringType(collId))
+      ))
+
+      // Define a streaming source (e.g., Kafka, file, socket)
+      val streamingSource = spark.readStream
+        .schema(schema) // Apply the schema to the streaming data
+        .parquet(s"~/tmp/$tableName")
+
+      val streamingDF = streamingSource.groupBy("c1").count()
+    }
+  }
+
+//  test("delta create table support") {
+//    val tableName = "delta_dummy_t"
+//    val session = SparkSession.builder()
+//      .master("local[1]")
+//      .config(StaticSQLConf.SPARK_SESSION_EXTENSIONS.key,
+//        "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+//      .config("spark.sql.catalog.spark_catalog",
+//        "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+//      .config("spark.jars.packages", "io.delta:delta-spark_2.13:3.0.0")
+//      .getOrCreate()
+//
+//    session.sql(
+//      s"""
+//        |CREATE TABLE $tableName
+//        |(id INT, c1 STRING COLLATE 'SR_CI_AI', c2 STRING)
+//        |USING DELTA
+//        |""".stripMargin)
+//
+//    session.sql(s"DROP TABLE IF EXISTS $tableName")
+//  }
 }
