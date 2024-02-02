@@ -528,6 +528,68 @@ trait FileSourceAggregatePushDownSuite
     }
   }
 
+  test("disable distinct count push down for collated strings") {
+    withSQLConf(aggPushDownEnabledKey -> "true") {
+      withTempPath { dir =>
+        sql(
+          """
+            SELECT id, collate(c, 'sr-primary') as c FROM VALUES
+            (1, 'ććć'), (1, 'ĆĆĆ'), (2, 'ččč'), (2, 'ČČČ')
+            as data(id, c)
+          """).write.partitionBy("id").format(format).save(dir.getCanonicalPath)
+
+        withTempView("tmp") {
+          spark.read.format(format).load(dir.getCanonicalPath).createOrReplaceTempView("tmp")
+//          val selectAgg = sql("SELECT COUNT(DISTINCT c) FROM tmp GROUP BY id")
+          val selectAgg = sql("SELECT COUNT(c) FROM tmp")
+          checkPushedInfo(selectAgg, "PushedAggregation: []")
+          checkAnswer(selectAgg, Seq(Row(1), Row(1)))
+        }
+      }
+    }
+  }
+
+  test("why does this fail?") {
+    withSQLConf(aggPushDownEnabledKey -> "true") {
+      withTempPath { dir =>
+        sql(
+          """
+           SELECT id , c FROM VALUES
+           (1, 'ććć'), (2, 'ĆĆĆ'), (3, 'ččč'), (4, 'ČČČ')
+           as data(id, c)
+         """).write.partitionBy("c").format(format).save(dir.getCanonicalPath)
+      }
+    }
+  }
+
+  test("disable agg push down for collated strings in group by") {
+    withSQLConf(aggPushDownEnabledKey -> "true") {
+      withTempPath { dir =>
+        val inp = sql(
+          """
+            SELECT id, collate(c, 'en-primary') as c FROM VALUES
+            (1, 'aaa'), (3, 'AAA')
+            as data(id, c)
+          """)
+
+        inp.write.partitionBy("c").format(format).save(dir.getCanonicalPath)
+
+        withTempView("tmp") {
+          spark.read.schema(inp.schema).format(format).load(dir.getCanonicalPath)
+            .createOrReplaceTempView("tmp")
+
+          var selectAgg = sql("SELECT COUNT(*) FROM tmp GROUP BY c")
+          checkPushedInfo(selectAgg, "PushedAggregation: []")
+          checkAnswer(selectAgg, Seq(Row(2), Row(2)))
+
+          selectAgg = sql("SELECT MIN(id), MAX(id) FROM tmp GROUP BY c")
+          checkPushedInfo(selectAgg, "PushedAggregation: []")
+          checkAnswer(selectAgg, Seq(Row(1, 3), Row(2, 4)))
+        }
+      }
+    }
+  }
+
   private def checkPushedInfo(df: DataFrame, expectedPlanFragment: String): Unit = {
     df.queryExecution.optimizedPlan.collect {
       case _: DataSourceV2ScanRelation =>

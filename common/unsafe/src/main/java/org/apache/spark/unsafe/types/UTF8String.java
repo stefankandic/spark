@@ -21,9 +21,7 @@ import javax.annotation.Nonnull;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import com.esotericsoftware.kryo.Kryo;
@@ -55,6 +53,7 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
 
   // These are only updated by readExternal() or read()
   @Nonnull
+  LinkedList
   protected Object base;
   protected long offset;
   protected int numBytes;
@@ -80,7 +79,7 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
    * Table 3-7 (page 126), the following byte values are disallowed in UTF-8:
    *   C0–C1, F5–FF.
    */
-  private static byte[] bytesOfCodePointInUTF8 = {
+  public static byte[] bytesOfCodePointInUTF8 = {
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x00..0x0F
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x10..0x1F
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // 0x20..0x2F
@@ -1785,3 +1784,4 @@ public class UTF8String implements Comparable<UTF8String>, Externalizable, KryoS
     in.read((byte[]) base);
   }
 }
+

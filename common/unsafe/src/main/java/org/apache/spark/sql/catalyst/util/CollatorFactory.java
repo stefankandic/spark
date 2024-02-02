@@ -16,7 +16,7 @@ public class CollatorFactory {
     new ArrayList<Comparator<UTF8String>>(10);
   private static ArrayList<Collator> collatorCache = new ArrayList<Collator>(10);
 
-  private static Collator getCollator(String collationName) {
+  private static Collator getColaltorStefan(String collationName) {
     var collationStrings = collationName.split("-");
 
     if (collationStrings.length != 2) {
@@ -47,7 +47,7 @@ public class CollatorFactory {
 
   public static int getCollationAwareHash(String input, String collation) {
     // TODO: Collator caching...
-    return getCollator(collation).getCollationKey(input).hashCode();
+    return getColaltorStefan(collation).getCollationKey(input).hashCode();
   }
 
   public static int getCollationAwareHash(String input, int collatorId) {
@@ -69,7 +69,7 @@ public class CollatorFactory {
       return collationNameToId.get(collationName);
     }
 
-    var collator = getCollator(collationName);
+    var collator = getColaltorStefan(collationName);
     var comparator = new Comparator<UTF8String>() {
       @Override
       public int compare(UTF8String o1, UTF8String o2) {

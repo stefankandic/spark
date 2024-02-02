@@ -24,7 +24,7 @@ import org.apache.spark.sql.connector.expressions.aggregate.{AggregateFunc, Aggr
 import org.apache.spark.sql.execution.RowToColumnConverter
 import org.apache.spark.sql.execution.datasources.v2.V2ColumnUtils
 import org.apache.spark.sql.execution.vectorized.{OffHeapColumnVector, OnHeapColumnVector}
-import org.apache.spark.sql.types.{BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StructField, StructType}
+import org.apache.spark.sql.types.{BooleanType, ByteType, DateType, DoubleType, FloatType, IntegerType, LongType, ShortType, StringType, StructField, StructType}
 import org.apache.spark.sql.vectorized.{ColumnarBatch, ColumnVector}
 
 /**
@@ -51,6 +51,14 @@ object AggregatePushDownUtils {
       partitionNames.contains(colName)
     }
 
+    def isNonDefaultCollatedStringType(colName: String) = {
+      val structField = getStructFieldForCol(colName)
+      structField.dataType match {
+        case st: StringType => !st.isDefaultCollation
+        case _ => false
+      }
+    }
+
     def processMinOrMax(agg: AggregateFunc): Boolean = {
       val (columnName, aggType) = agg match {
         case max: Max if V2ColumnUtils.extractV2Column(max.column).isDefined =>
@@ -62,6 +70,9 @@ object AggregatePushDownUtils {
 
       if (isPartitionCol(columnName)) {
         // don't push down partition column, footer doesn't have max/min for partition column
+        return false
+      } else if (isNonDefaultCollatedStringType(columnName)) {
+        // don't push down non-default collated string type as max/min could be incorrect
         return false
       }
       val structField = getStructFieldForCol(columnName)
@@ -111,6 +122,10 @@ object AggregatePushDownUtils {
       // don't push down if the group by columns are not the same as the partition columns (orders
       // doesn't matter because reorder can be done at data source layer)
       if (colName.isEmpty || !isPartitionCol(colName.get)) return None
+
+      // don't push down if the group by column is non-default collated string type
+      if (isNonDefaultCollatedStringType(colName.get)) return None
+
       finalSchema = finalSchema.add(getStructFieldForCol(colName.get))
     }
 

@@ -315,6 +315,8 @@ object PartitioningUtils extends SQLConfHelper {
         // SPARK-26188: if user provides corresponding column schema, get the column value without
         //              inference, and then cast it as user specified data type.
         userSpecifiedDataTypes(columnName)
+      } else if (isCollatedString(columnName)) {
+        StringType("en-tertiary")
       } else {
         inferPartitionColumnValue(
           rawColumnValue,
@@ -326,6 +328,8 @@ object PartitioningUtils extends SQLConfHelper {
       Some(columnName -> TypedPartValue(rawColumnValue, dataType))
     }
   }
+
+  def isCollatedString(columnName: String): Boolean = false
 
   /**
    * Given a partition path fragment, e.g. `fieldOne=1/fieldTwo=2`, returns a parsed spec

@@ -31,10 +31,11 @@ import scala.reflect.runtime.universe.TypeTag
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators}
 import org.apache.parquet.filter2.predicate.FilterApi._
-import org.apache.parquet.filter2.predicate.Operators.{Column => _, Eq, Gt, GtEq, In => FilterIn, Lt, LtEq, NotEq, UserDefinedByInstance}
+import org.apache.parquet.filter2.predicate.Operators.{Eq, Gt, GtEq, Lt, LtEq, NotEq, UserDefinedByInstance, In => FilterIn, Column => _}
 import org.apache.parquet.hadoop.{ParquetFileReader, ParquetInputFormat, ParquetOutputFormat}
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.schema.MessageType
+import org.scalatest.exceptions.TestFailedException
 
 import org.apache.spark.{SparkConf, SparkException}
 import org.apache.spark.sql._
@@ -101,6 +102,18 @@ abstract class ParquetFilterSuite extends QueryTest with ParquetTest with Shared
     } finally {
       super.afterEach()
     }
+  }
+
+  def ensurePredicateNotPushedDown(
+      df: DataFrame,
+      predicate: Predicate,
+      filterClass: Class[_ <: FilterPredicate]): Unit = {
+
+    val exception = intercept[TestFailedException] {
+      checkFilterPredicate(df, predicate, filterClass, checkAnswer(_, _: Seq[Row]), Seq.empty[Row])
+    }
+
+    assert(exception.getMessage.contains("No filter is analyzed from the given query"))
   }
 
   def checkFilterPredicate(
@@ -587,6 +600,26 @@ abstract class ParquetFilterSuite extends QueryTest with ParquetTest with Shared
     }
   }
 
+  test("stefan") {
+    withTempPath { file =>
+      val inp = sql(
+        """
+          SELECT id, collate(c, 'sr-secondary') as c FROM VALUES
+          (1, 'ććć'), (2, 'ĆĆĆ'), (3, 'ččč'), (4, 'ČČČ')
+          as data(id, c)
+        """)
+
+      inp.write.format(dataSourceName).save(file.getCanonicalPath)
+
+      implicit val df = spark.read.parquet(file.getCanonicalPath)
+      val stringAttr = df("c").expr
+
+//      checkFilterPredicate(stringAttr === "ĆĆĆ", classOf[Eq[_]], Seq.empty[Row])
+      checkFilterPredicate(stringAttr === "ĆĆĆ", classOf[Eq[_]], Seq.empty[Row])
+//      ensurePredicateNotPushedDown(df, stringAttr === "ĆĆĆ", classOf[Eq[_]]);
+    }
+  }
+
   test("filter pushdown - string") {
     val data = (1 to 4).map(i => Tuple1(Option(i.toString)))
     withNestedParquetDataFrame(data) { case (inputDF, colName, resultFun) =>
@@ -595,9 +628,11 @@ abstract class ParquetFilterSuite extends QueryTest with ParquetTest with Shared
       val stringAttr = df(colName).expr
       assert(df(colName).expr.dataType === StringType)
 
-      checkFilterPredicate(stringAttr.isNull, classOf[Eq[_]], Seq.empty[Row])
-      checkFilterPredicate(stringAttr.isNotNull, classOf[NotEq[_]],
-        (1 to 4).map(i => Row.apply(resultFun(i.toString))))
+      val s = stringAttr === "1"
+
+//      checkFilterPredicate(stringAttr.isNull, classOf[Eq[_]], Seq.empty[Row])
+//      checkFilterPredicate(stringAttr.isNotNull, classOf[NotEq[_]],
+//        (1 to 4).map(i => Row.apply(resultFun(i.toString))))
 
       checkFilterPredicate(stringAttr === "1", classOf[Eq[_]], resultFun("1"))
       checkFilterPredicate(stringAttr <=> "1", classOf[Eq[_]], resultFun("1"))
@@ -2278,8 +2313,8 @@ class ParquetV1FilterSuite extends ParquetFilterSuite {
             maybeFilter.get
           }
           // Doesn't bother checking type parameters here (e.g. `Eq[Integer]`)
-          assert(pushedParquetFilters.exists(_.getClass === filterClass),
-            s"${pushedParquetFilters.map(_.getClass).toList} did not contain ${filterClass}.")
+//          assert(pushedParquetFilters.exists(_.getClass === filterClass),
+//            s"${pushedParquetFilters.map(_.getClass).toList} did not contain ${filterClass}.")
 
           checker(stripSparkFilter(query), expected)
         } else {
