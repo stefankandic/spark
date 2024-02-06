@@ -298,8 +298,6 @@ object DataSourceUtils extends PredicateHelper {
         }
     }
 
-    val ret = expression.deterministic && checkRecursive(expression)
-    ret
-//    expression.deterministic && checkRecursive(expression)
+    expression.deterministic && checkRecursive(expression)
   }
 }
