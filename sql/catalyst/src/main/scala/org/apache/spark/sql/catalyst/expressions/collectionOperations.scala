@@ -946,6 +946,36 @@ case class MapSort(base: Expression, ascendingOrder: Expression)
       )
   }
 
+   def nullSafeEval2(array: Any, ascending: Any): Any = {
+    // put keys and their respective indices inside a tuple
+    // and sort them to extract new order k/v pairs
+
+    val mapData = array.asInstanceOf[MapData]
+    val numElements = mapData.numElements()
+    val keys = mapData.keyArray()
+    val values = mapData.valueArray()
+
+    val ordering = if (ascending.asInstanceOf[Boolean]) {
+      PhysicalDataType.ordering(keyType)
+    } else {
+      PhysicalDataType.ordering(keyType).reverse
+    }
+
+    val sortedKeys = Array
+      .tabulate(numElements)(i => ( keys.get(i, keyType).asInstanceOf[Any], i))
+      .sortBy(_._1)(ordering)
+
+    val newKeys = new Array[Any](numElements)
+    val newValues = new Array[Any](numElements)
+
+    sortedKeys.zipWithIndex.foreach { case (elem, index) =>
+      newKeys(index) = keys.get(elem._2, keyType)
+      newValues(index) = values.get(elem._2, valueType)
+    }
+
+    new ArrayBasedMapData(new GenericArrayData(newKeys), new GenericArrayData(newValues))
+  }
+
   override def nullSafeEval(array: Any, ascending: Any): Any = {
     // put keys in a tree map and then read them back to build new k/v arrays
 
