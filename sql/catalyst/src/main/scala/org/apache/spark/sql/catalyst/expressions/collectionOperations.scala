@@ -1020,6 +1020,81 @@ case class MapSort(base: Expression, ascendingOrder: Expression)
     val keys = ctx.freshName("keys")
     val values = ctx.freshName("values")
     val treeMap = ctx.freshName("treeMap")
+    val sortArray = ctx.freshName("sortArray")
+    val i = ctx.freshName("i")
+    val o1 = ctx.freshName("o1")
+    val o1arr = ctx.freshName("o1arr")
+    val o2 = ctx.freshName("o2")
+    val o2arr = ctx.freshName("o2arr")
+    val c = ctx.freshName("c")
+    val newKeys = ctx.freshName("newKeys")
+    val newValues = ctx.freshName("newValues")
+    val mapEntry = ctx.freshName("mapEntry")
+    val originalIndex = ctx.freshName("originalIndex")
+
+    val boxedKeyType = CodeGenerator.boxedType(keyType)
+    val javaKeyType = CodeGenerator.javaType(keyType)
+
+    val simpleEntryType = s"java.util.AbstractMap.SimpleEntry<$boxedKeyType, Integer>"
+
+    val comp = if (CodeGenerator.isPrimitiveType(keyType)) {
+      val v1 = ctx.freshName("v1")
+      val v2 = ctx.freshName("v2")
+      s"""
+         |$javaKeyType $v1 = (($boxedKeyType) $o1).${javaKeyType}Value();
+         |$javaKeyType $v2 = (($boxedKeyType) $o2).${javaKeyType}Value();
+         |int $c = ${ctx.genComp(keyType, v1, v2)};
+       """.stripMargin
+    } else {
+      s"int $c = ${ctx.genComp(keyType, s"(($javaKeyType) $o1)", s"(($javaKeyType) $o2)")};"
+    }
+
+    s"""
+       |final int $numElements = $base.numElements();
+       |ArrayData $keys = $base.keyArray();
+       |ArrayData $values = $base.valueArray();
+       |
+       |Object[] $sortArray = new Object[$numElements];
+       |
+       |for (int $i = 0; $i < $numElements; $i++) {
+       |  $sortArray[$i] = new $simpleEntryType(
+       |    ${CodeGenerator.getValue(keys, keyType, i)}, $i);
+       |}
+       |
+       |java.util.Arrays.sort($sortArray, new java.util.Comparator<Object>() {
+       |  @Override public int compare(Object $o1arr, Object $o2arr) {
+       |    Object $o1 = (($simpleEntryType) $o1arr).getKey();
+       |    Object $o2 = (($simpleEntryType) $o2arr).getKey();
+       |    $comp;
+       |    return $order ? $c : -$c;
+       |  }
+       |});
+       |
+       |Object[] $newKeys = new Object[$numElements];
+       |Object[] $newValues = new Object[$numElements];
+       |
+       |for (int $i = 0; $i < $numElements; $i++) {
+       |  int $originalIndex = (Integer) ((($simpleEntryType) $sortArray[$i]).getValue());
+       |  $newKeys[$i] = ${CodeGenerator.getValue(keys, keyType, originalIndex)};
+       |  $newValues[$i] = ${CodeGenerator.getValue(values, valueType, originalIndex)};
+       |}
+       |
+       |
+       |${ev.value} = new $arrayBasedMapData(
+       |  new $genericArrayData($newKeys), new $genericArrayData($newValues));
+       |""".stripMargin
+  }
+
+  private def sortCodegen2(ctx: CodegenContext, ev: ExprCode,
+                          base: String, order: String): String = {
+
+    val arrayBasedMapData = classOf[ArrayBasedMapData].getName
+    val genericArrayData = classOf[GenericArrayData].getName
+
+    val numElements = ctx.freshName("numElements")
+    val keys = ctx.freshName("keys")
+    val values = ctx.freshName("values")
+    val treeMap = ctx.freshName("treeMap")
     val i = ctx.freshName("i")
     val o1 = ctx.freshName("o1")
     val o2 = ctx.freshName("o2")
@@ -1039,43 +1114,45 @@ case class MapSort(base: Expression, ascendingOrder: Expression)
          |$javaKeyType $v1 = (($boxedKeyType) $o1).${javaKeyType}Value();
          |$javaKeyType $v2 = (($boxedKeyType) $o2).${javaKeyType}Value();
          |int $c = ${ctx.genComp(keyType, v1, v2)};
-       """.stripMargin
+     """.stripMargin
     } else {
       s"int $c = ${ctx.genComp(keyType, s"(($javaKeyType) $o1)", s"(($javaKeyType) $o2)")};"
     }
 
-    s"""
-       |final int $numElements = $base.numElements();
-       |ArrayData $keys = $base.keyArray();
-       |ArrayData $values = $base.valueArray();
-       |
-       |java.util.TreeMap<$boxedKeyType, Integer> $treeMap = new java.util.TreeMap<>(
-       |  new java.util.Comparator() {
-       |    @Override public int compare(Object $o1, Object $o2) {
-       |      $comp;
-       |      return $order ? $c : -$c;
-       |    }
-       |  }
-       |);
-       |
-       |for (int $i = 0; $i < $numElements; $i++) {
-       |  $treeMap.put(${CodeGenerator.getValue(keys, keyType, i)}, $i);
-       |}
-       |
-       |Object[] $newKeys = new Object[$numElements];
-       |Object[] $newValues = new Object[$numElements];
-       |
-       |int $i = 0;
-       |for (java.util.Map.Entry<$boxedKeyType, Integer> $mapEntry : $treeMap.entrySet()) {
-       |  int $originalIndex = (Integer) $mapEntry.getValue();
-       |  $newKeys[$i] = ${CodeGenerator.getValue(keys, keyType, originalIndex)};
-       |  $newValues[$i] = ${CodeGenerator.getValue(values, valueType, originalIndex)};
-       |  $i++;
-       |}
-       |
-       |${ev.value} = new $arrayBasedMapData(
-       |  new $genericArrayData($newKeys), new $genericArrayData($newValues));
-       |""".stripMargin
+    val x =
+      s"""
+         |final int $numElements = $base.numElements();
+         |ArrayData $keys = $base.keyArray();
+         |ArrayData $values = $base.valueArray();
+         |
+         |java.util.TreeMap<$boxedKeyType, Integer> $treeMap = new java.util.TreeMap<>(
+         |  new java.util.Comparator() {
+         |    @Override public int compare(Object $o1, Object $o2) {
+         |      $comp;
+         |      return $order ? $c : -$c;
+         |    }
+         |  }
+         |);
+         |
+         |for (int $i = 0; $i < $numElements; $i++) {
+         |  $treeMap.put(${CodeGenerator.getValue(keys, keyType, i)}, $i);
+         |}
+         |
+         |Object[] $newKeys = new Object[$numElements];
+         |Object[] $newValues = new Object[$numElements];
+         |
+         |int $i = 0;
+         |for (java.util.Map.Entry<$boxedKeyType, Integer> $mapEntry : $treeMap.entrySet()) {
+         |  int $originalIndex = (Integer) $mapEntry.getValue();
+         |  $newKeys[$i] = ${CodeGenerator.getValue(keys, keyType, originalIndex)};
+         |  $newValues[$i] = ${CodeGenerator.getValue(values, valueType, originalIndex)};
+         |  $i++;
+         |}
+         |
+         |${ev.value} = new $arrayBasedMapData(
+         |  new $genericArrayData($newKeys), new $genericArrayData($newValues));
+         |""".stripMargin
+    x
   }
 
   override def prettyName: String = "map_sort"

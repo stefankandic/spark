@@ -17,20 +17,20 @@
 
 package org.apache.spark.sql.catalyst.expressions
 
+import org.apache.spark.benchmark.Benchmark
+
 import java.sql.{Date, Timestamp}
 import java.time.{Duration, LocalDateTime, Period}
 import java.util.TimeZone
-
 import scala.language.implicitConversions
 import scala.util.Random
-
 import org.apache.spark.{SparkFunSuite, SparkRuntimeException}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult.DataTypeMismatch
 import org.apache.spark.sql.catalyst.util.{DateTimeTestUtils, DateTimeUtils}
-import org.apache.spark.sql.catalyst.util.DateTimeTestUtils.{outstandingZoneIds, LA, UTC}
+import org.apache.spark.sql.catalyst.util.DateTimeTestUtils.{LA, UTC, outstandingZoneIds}
 import org.apache.spark.sql.catalyst.util.IntervalUtils._
 import org.apache.spark.sql.catalyst.util.TypeUtils.ordinalNumber
 import org.apache.spark.sql.errors.DataTypeErrorsBase
@@ -38,6 +38,8 @@ import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.array.ByteArrayMethods
 import org.apache.spark.unsafe.types.UTF8String
+
+import scala.math.pow
 
 class CollectionExpressionsSuite
   extends SparkFunSuite with ExpressionEvalHelper with DataTypeErrorsBase {
@@ -421,8 +423,68 @@ class CollectionExpressionsSuite
     )
   }
 
+  test("Sort Map - Benchmark test for code-gen") {
+    // Checks Treemap implementation vs array quicksort for map sorting
+
+    val genMapData: Int => Map[Int, Int] = x => {
+      (0 until x).toArray.map(i => i -> i).toMap
+    }
+
+    val measurePerf: Int => Long = x => {
+      val mapData = Literal.create(
+        genMapData(x),
+        MapType(IntegerType, IntegerType)
+      )
+
+      val timer = new Benchmark.Timer(-1);
+      timer.startTiming()
+      codegenEvaluation(new MapSort(mapData))
+      timer.stopTiming()
+
+      timer.totalTime()
+    }
+
+    // measure perf
+    (0 until 23).foreach { i =>
+      // scalastyle:off println
+      print((measurePerf(pow(2, i).toInt) / 1000000).toString + " ")
+      // scalastyle:on println
+    }
+
+  }
+
+  test("Sort Map - Benchmark test for scala implementation") {
+    // Checks Treemap implementation vs array quicksort for map sorting
+
+    val genMapData : Int => Map[Int, Int] = x => {
+      (0 until x).toArray.map(i => i -> i).toMap
+    }
+
+    val measurePerf : Int => Long = x => {
+      val mapData = Literal.create(
+        genMapData(x),
+        MapType(IntegerType, IntegerType)
+      )
+
+      val timer = new Benchmark.Timer(-1);
+      timer.startTiming()
+      new MapSort(mapData).eval()
+      timer.stopTiming()
+      timer.totalTime()
+    }
+
+    // measure perf
+    (0 until 23).foreach { i =>
+      // scalastyle:off println
+      print((measurePerf( pow(2, i).toInt) / 1000000).toString + " ")
+      // scalastyle:on println
+    }
+
+  }
+
   test("Sort Map") {
-    val intKey = Literal.create(Map(2 -> 2, 1 -> 1, 3 -> 3), MapType(IntegerType, IntegerType))
+    val intKey = Literal.create(Map(2 -> 2, 1 -> 1, 3 -> 3),
+      MapType(IntegerType, IntegerType))
     val boolKey = Literal.create(Map(true -> 2, false -> 1), MapType(BooleanType, IntegerType))
     val stringKey = Literal.create(Map("2" -> 2, "1" -> 1, "3" -> 3),
       MapType(StringType, IntegerType))

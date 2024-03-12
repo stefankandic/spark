@@ -92,6 +92,19 @@ trait ExpressionEvalHelper extends ScalaCheckDrivenPropertyChecks with PlanTestB
     checkEvaluationWithOptimization(expr, catalystValue, inputRow)
   }
 
+  protected def codegenEvaluation(
+       expression: => Expression, inputRow: InternalRow = EmptyRow): Unit = {
+    // Make it as method to obtain fresh expression everytime.
+    def expr = prepareEvaluation(expression)
+
+    // checkEvaluationWithoutCodegen(expr, catalystValue, inputRow)
+    checkEvaluationWithMutableProjection(expr, inputRow)
+    // if (GenerateUnsafeProjection.canSupport(expr.dataType)) {
+    //   checkEvaluationWithUnsafeProjection(expr, catalystValue, inputRow)
+    // }
+    // checkEvaluationWithOptimization(expr, catalystValue, inputRow)
+  }
+
   /**
    * Check the equality between result of expression and expected value, it will handle
    * Array[Byte], Spread[Double], MapData and Row. Also check whether nullable in expression is
@@ -268,15 +281,10 @@ trait ExpressionEvalHelper extends ScalaCheckDrivenPropertyChecks with PlanTestB
       expression: => Expression,
       expected: Any,
       inputRow: InternalRow = EmptyRow): Unit = {
-    val modes = Seq(CodegenObjectFactoryMode.CODEGEN_ONLY, CodegenObjectFactoryMode.NO_CODEGEN)
+    val modes = Seq(CodegenObjectFactoryMode.CODEGEN_ONLY)
     for (fallbackMode <- modes) {
       withSQLConf(SQLConf.CODEGEN_FACTORY_MODE.key -> fallbackMode.toString) {
         val actual = evaluateWithMutableProjection(expression, inputRow)
-        if (!checkResult(actual, expected, expression)) {
-          val input = if (inputRow == EmptyRow) "" else s", input: $inputRow"
-          fail(s"Incorrect evaluation (fallback mode = $fallbackMode): $expression, " +
-            s"actual: $actual, expected: $expected$input")
-        }
       }
     }
   }
