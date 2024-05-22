@@ -22,7 +22,7 @@ name: "Build"
 on:
   push:
     branches:
-      - '**'
+    - '**'
 
 jobs:
   set-concurrency-group:
