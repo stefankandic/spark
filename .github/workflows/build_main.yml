@@ -36,7 +36,7 @@ jobs:
           base_group="${{ github.workflow }}-${{ github.ref }}"
           if [ "${{ github.repository_owner }}" == "apache" ]; then
             # Add a random suffix to workflows in apache/spark so that
-            # can run multiple workflows concurrently.
+            # it can run multiple workflows concurrently.
             echo "output=${base_group}-$(uuidgen)" >> $GITHUB_OUTPUT
           else
             echo "output=${base_group}" >> $GITHUB_OUTPUT
