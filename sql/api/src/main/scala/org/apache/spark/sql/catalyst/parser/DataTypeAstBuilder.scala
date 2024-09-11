@@ -24,7 +24,6 @@ import org.antlr.v4.runtime.Token
 import org.antlr.v4.runtime.tree.ParseTree
 
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
-import org.apache.spark.sql.catalyst.util.CollationFactory
 import org.apache.spark.sql.catalyst.util.SparkParserUtils.{string, withOrigin}
 import org.apache.spark.sql.errors.QueryParsingErrors
 import org.apache.spark.sql.internal.SqlApiConf
@@ -75,10 +74,7 @@ class DataTypeAstBuilder extends SqlBaseParserBaseVisitor[AnyRef] {
       case (STRING, Nil) =>
         typeCtx.children.asScala.toSeq match {
           case Seq(_) => SqlApiConf.get.defaultStringType
-          case Seq(_, ctx: CollateClauseContext) =>
-            val collationName = visitCollateClause(ctx)
-            val collationId = CollationFactory.collationNameToId(collationName)
-            StringType(collationId)
+          case Seq(_, ctx: CollateClauseContext) => StringType(visitCollateClause(ctx))
         }
       case (CHARACTER | CHAR, length :: Nil) => CharType(length.getText.toInt)
       case (VARCHAR, length :: Nil) => VarcharType(length.getText.toInt)
@@ -214,10 +210,31 @@ class DataTypeAstBuilder extends SqlBaseParserBaseVisitor[AnyRef] {
     string(visitStringLit(ctx.stringLit))
   }
 
+
+  protected def visitCollateClauseList(
+      ctx: java.util.List[CollateClauseContext]): Option[String] = {
+    ctx.asScala.headOption.map(visitCollateClause)
+  }
+
   /**
    * Returns a collation name.
    */
   override def visitCollateClause(ctx: CollateClauseContext): String = withOrigin(ctx) {
     ctx.identifier.getText
   }
+
+  protected def visitCollateClauseListWithValidation(
+      ctx: java.util.List[CollateClauseContext]): Option[String] = {
+    ctx.asScala.headOption.map(visitCollateClauseWithValidation)
+  }
+
+  /**
+   * Returns a [[StringType]] with a collation name.
+   */
+  protected def visitCollateClauseWithValidation(ctx: CollateClauseContext): String =
+    withOrigin(ctx) {
+      val collationName = visitCollateClause(ctx)
+      StringType(collationName)
+      collationName
+    }
 }

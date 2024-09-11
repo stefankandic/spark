@@ -74,6 +74,7 @@ class DescribeTableSuite extends v1.DescribeTableSuiteBase with CommandSuiteBase
           Row("Last Access", "UNKNOWN", ""),
           Row("Type", "EXTERNAL", ""),
           Row("Provider", getProvider(), ""),
+          //TODO: add tests
           Row("Comment", "this is a test table", ""),
           Row("Location", "file:/tmp/testcat/table_name", ""),
           Row("Serde Library", "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", ""),

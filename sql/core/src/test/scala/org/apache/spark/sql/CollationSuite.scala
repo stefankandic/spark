@@ -1621,4 +1621,34 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
       }
     }
   }
+
+  test("ffdf") {
+    withTable("tbl") {
+      sql(s"CREATE TABLE tbl (id STRING) using parquet")
+      sql(s"SET COLLATION UNICODE")
+      sql(s"INSERT INTO tbl VALUES ('a')")
+      sql("ALTER TABLE tbl ALTER COLUMN id TYPE STRING COLLATE UTF8_LCASE")
+      checkAnswer(
+        sql(s"SELECT COLLATION(id) FROM tbl"),
+        Seq(Row("UNICODE"))
+      )
+    }
+  }
+
+  test("snd") {
+    withTable("tbl") {
+      sql(s"CREATE DATABASE db1 COLLATE UNICODE_AI")
+      sql(s"CREATE TABLE db1.tbl (id STRING) using parquet COMMENT 'asdf' COLLATE UNICODE")
+      checkAnswer(
+        sql(s"DESCRIBE SCHEMA db1"),
+        Seq(Row("id"))
+      )
+      checkAnswer(
+        sql(s"DESCRIBE TABLE EXTENDED db1.tbl"),
+        Seq(Row("id"))
+      )
+      sql(s"ALTER TABLE db1.tbl ALTER COLUMN id TYPE STRING COLLATE UTF8_LCASE")
+      sql(s"DROP DATABASE db1 CASCADE")
+    }
+  }
 }

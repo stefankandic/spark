@@ -60,6 +60,11 @@ public interface SupportsNamespaces extends CatalogPlugin {
   String PROP_OWNER = "owner";
 
   /**
+   * A reserved property to specify the collation of the namespace.
+   */
+  String PROP_COLLATION = "collation";
+
+  /**
    * List top-level namespaces from the catalog.
    * <p>
    * If an object such as a table, view, or function exists, its parent namespaces must also exist

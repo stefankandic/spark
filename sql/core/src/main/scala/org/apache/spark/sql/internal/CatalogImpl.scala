@@ -687,6 +687,8 @@ class CatalogImpl(sparkSession: SparkSession) extends Catalog {
       optionExpression = newOptions,
       location = location,
       comment = { if (description.isEmpty) None else Some(description) },
+      // TODO: is this okay to do?
+      collation = None,
       serde = None,
       external = tableType == CatalogTableType.EXTERNAL)
 

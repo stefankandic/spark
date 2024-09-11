@@ -26,11 +26,12 @@ import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, Statistics}
 import org.apache.spark.sql.catalyst.trees.TreePattern.{TreePattern, UNRESOLVED_FUNC}
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.CharVarcharUtils
-import org.apache.spark.sql.connector.catalog.{CatalogPlugin, FunctionCatalog, Identifier, Table, TableCatalog}
+import org.apache.spark.sql.connector.catalog.{CatalogPlugin, FunctionCatalog, Identifier, SupportsNamespaces, Table, TableCatalog}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.connector.catalog.TableChange.ColumnPosition
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction
-import org.apache.spark.sql.types.{DataType, StructField}
+import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DataType, StringType, StructField}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.ArrayImplicits._
 
@@ -169,6 +170,30 @@ case class ResolvedTable(
     outputAttributes.map(_.withQualifier(qualifier.toImmutableArraySeq))
   }
   def name: String = (catalog.name +: identifier.namespace() :+ identifier.name()).quoted
+
+  /**
+   * Returns default collation of the table if it exists.
+   */
+  def getCollation: Option[StringType] = {
+    // Check session-level collation first
+    Option.when(SQLConf.get.isDefaultCollationConfigSet)(SQLConf.get.defaultStringType)
+      // Check table-level collation if session-level is not set
+      .orElse(getTableDefinedCollation)
+      // Check namespace-level collation if table-level is not set
+      .orElse(getNamespaceDefinedCollation)
+  }
+
+  private def getTableDefinedCollation: Option[StringType] = {
+    Option(table.properties().get(SupportsNamespaces.PROP_COLLATION))
+      .map(StringType(_))
+  }
+
+  private def getNamespaceDefinedCollation: Option[StringType] = {
+    Option(catalog.asNamespaceCatalog
+      .loadNamespaceMetadata(identifier.namespace())
+      .get(SupportsNamespaces.PROP_COLLATION)
+    ).map(StringType(_))
+  }
 }
 
 object ResolvedTable {
@@ -177,7 +202,10 @@ object ResolvedTable {
       identifier: Identifier,
       table: Table): ResolvedTable = {
     val schema = CharVarcharUtils.replaceCharVarcharWithStringInSchema(table.columns.asSchema)
-    ResolvedTable(catalog, identifier, table, toAttributes(schema))
+    val tb2 = catalog.loadTable(identifier)
+    val xy = ResolvedTable(catalog, identifier, table, toAttributes(schema))
+    xy.getCollation
+    xy
   }
 }
 

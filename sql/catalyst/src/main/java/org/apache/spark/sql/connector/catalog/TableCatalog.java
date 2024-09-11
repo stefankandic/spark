@@ -67,6 +67,8 @@ public interface TableCatalog extends CatalogPlugin {
    */
   String PROP_COMMENT = "comment";
 
+  String PROP_COLLATION = "collation";
+
   /**
    * A reserved property to specify the provider of the table.
    */
