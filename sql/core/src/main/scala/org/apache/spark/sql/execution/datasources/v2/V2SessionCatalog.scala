@@ -503,8 +503,11 @@ private[sql] object V2SessionCatalog {
           .map(CatalogUtils.stringToURI)
           .orElse(defaultLocation)
           .getOrElse(throw QueryExecutionErrors.missingDatabaseLocationError()),
+      collation = Option(metadata.get(SupportsNamespaces.PROP_COLLATION)),
       properties = metadata.asScala.toMap --
-        Seq(SupportsNamespaces.PROP_COMMENT, SupportsNamespaces.PROP_LOCATION))
+        Seq(SupportsNamespaces.PROP_COMMENT,
+          SupportsNamespaces.PROP_LOCATION,
+          SupportsNamespaces.PROP_COLLATION))
   }
 
   private implicit class CatalogDatabaseHelper(catalogDatabase: CatalogDatabase) {
@@ -516,6 +519,7 @@ private[sql] object V2SessionCatalog {
       }
       metadata.put(SupportsNamespaces.PROP_LOCATION, catalogDatabase.locationUri.toString)
       metadata.put(SupportsNamespaces.PROP_COMMENT, catalogDatabase.description)
+      metadata.put(SupportsNamespaces.PROP_COLLATION, catalogDatabase.collation.orNull)
 
       metadata.asJava
     }

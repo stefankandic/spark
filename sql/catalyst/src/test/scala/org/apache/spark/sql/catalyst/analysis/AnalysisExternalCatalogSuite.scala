@@ -33,7 +33,7 @@ class AnalysisExternalCatalogSuite extends AnalysisTest with Matchers {
   private def getAnalyzer(externCatalog: ExternalCatalog, databasePath: File): Analyzer = {
     val catalog = new SessionCatalog(externCatalog, FunctionRegistry.builtin)
     catalog.createDatabase(
-      CatalogDatabase("default", "", databasePath.toURI, Map.empty),
+      CatalogDatabase("default", "", databasePath.toURI, None, Map.empty),
       ignoreIfExists = false)
     catalog.createTable(
       CatalogTable(
@@ -66,7 +66,7 @@ class AnalysisExternalCatalogSuite extends AnalysisTest with Matchers {
       val externCatalog = spy[InMemoryCatalog](inMemoryCatalog)
       val catalog = new SessionCatalog(externCatalog, FunctionRegistry.builtin)
       catalog.createDatabase(
-        CatalogDatabase("default", "", new URI(tempDir.toString), Map.empty),
+        CatalogDatabase("default", "", new URI(tempDir.toString), None, Map.empty),
         ignoreIfExists = false)
       reset(externCatalog)
       catalog.functionExists(FunctionIdentifier("sum"))

@@ -1624,4 +1624,21 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
       }
     }
   }
+
+  test("collation") {
+    sql(s"CREATE TABLE s1 (c STRING) USING PARQUET DEFAULT COLLATION UNICODE")
+    sql(s"CREATE SCHEMA s DEFAULT COLLATION UTF8_LCASE")
+    sql("ALTER SCHEMA s DEFAULT COLLATION UNICODE_CI")
+//    checkAnswer(
+//    sql(s"DESCRIBE SCHEMA EXTENDED s"),
+//      Seq(Row("")))
+
+    sql("ALTER TABLE s1 DEFAULT COLLATION UNICODE_CI")
+    checkAnswer(
+      sql(s"DESCRIBE TABLE EXTENDED s1"),
+      Seq(Row(""))
+    )
+
+    sql(s"DROP SCHEMA s CASCADE")
+  }
 }

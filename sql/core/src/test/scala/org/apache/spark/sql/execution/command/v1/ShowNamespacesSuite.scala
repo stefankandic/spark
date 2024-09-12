@@ -40,6 +40,7 @@ trait ShowNamespacesSuiteBase extends command.ShowNamespacesSuiteBase {
         name = ns,
         description = "",
         locationUri = Utils.createTempDir().toURI,
+        collation = None,
         properties = Map.empty),
       ignoreIfExists = false)
   }

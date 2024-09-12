@@ -47,7 +47,7 @@ class ExternalCatalogEventSuite extends SparkFunSuite {
   }
 
   private def createDbDefinition(uri: URI): CatalogDatabase = {
-    CatalogDatabase(name = "db5", description = "", locationUri = uri, Map.empty)
+    CatalogDatabase(name = "db5", description = "", locationUri = uri, None, Map.empty)
   }
 
   private def createDbDefinition(): CatalogDatabase = {

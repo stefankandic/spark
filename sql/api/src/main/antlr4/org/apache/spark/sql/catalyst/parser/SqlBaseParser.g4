@@ -144,6 +144,7 @@ statement
     | CREATE namespace (IF errorCapturingNot EXISTS)? identifierReference
         (commentSpec |
          locationSpec |
+         collationSpec |
          (WITH (DBPROPERTIES | PROPERTIES) propertyList))*             #createNamespace
     | ALTER namespace identifierReference
         SET (DBPROPERTIES | PROPERTIES) propertyList                   #setNamespaceProperties
@@ -151,6 +152,8 @@ statement
         UNSET (DBPROPERTIES | PROPERTIES) propertyList                 #unsetNamespaceProperties
     | ALTER namespace identifierReference
         SET locationSpec                                               #setNamespaceLocation
+    | ALTER namespace identifierReference
+        collationSpec                                                  #alterNamespaceCollation
     | DROP namespace (IF EXISTS)? identifierReference
         (RESTRICT | CASCADE)?                                          #dropNamespace
     | SHOW namespaces ((FROM | IN) multipartIdentifier)?
@@ -164,6 +167,7 @@ statement
         rowFormat |
         createFileFormat |
         locationSpec |
+        collationSpec |
         (TBLPROPERTIES tableProps=propertyList))*                      #createTableLike
     | replaceTableHeader (LEFT_PAREN colDefinitionList RIGHT_PAREN)? tableProvider?
         createTableClauses
@@ -218,6 +222,8 @@ statement
     | ALTER TABLE identifierReference RECOVER PARTITIONS                 #recoverPartitions
     | ALTER TABLE identifierReference
         (clusterBySpec | CLUSTER BY NONE)                              #alterClusterBy
+    | ALTER TABLE identifierReference
+        collationSpec                                                  #alterTableCollation
     | DROP TABLE (IF EXISTS)? identifierReference PURGE?               #dropTable
     | DROP VIEW (IF EXISTS)? identifierReference                       #dropView
     | CREATE (OR REPLACE)? (GLOBAL? TEMPORARY)?
@@ -506,6 +512,7 @@ createTableClauses
      createFileFormat |
      locationSpec |
      commentSpec |
+     collationSpec |
      (TBLPROPERTIES tableProps=propertyList))*
     ;
 
@@ -1201,6 +1208,10 @@ unitInUnitToUnit
 
 colPosition
     : position=FIRST | position=AFTER afterCol=errorCapturingIdentifier
+    ;
+
+collationSpec
+    : DEFAULT COLLATION collationName=identifier
     ;
 
 collateClause

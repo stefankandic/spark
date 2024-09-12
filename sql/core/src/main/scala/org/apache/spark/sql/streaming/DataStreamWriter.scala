@@ -326,6 +326,7 @@ final class DataStreamWriter[T] private[sql](ds: Dataset[T]) {
         OptionList(Seq.empty),
         extraOptions.get("path"),
         None,
+        extraOptions.get("collation"),
         None,
         false)
       val cmd = CreateTable(

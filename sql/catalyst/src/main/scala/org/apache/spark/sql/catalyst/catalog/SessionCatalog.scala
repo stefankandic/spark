@@ -311,7 +311,10 @@ class SessionCatalog(
     val dbName = format(dbDefinition.name)
     requireDbExists(dbName)
     externalCatalog.alterDatabase(dbDefinition.copy(
-      name = dbName, locationUri = makeQualifiedDBPath(dbDefinition.locationUri)))
+      name = dbName,
+      locationUri = makeQualifiedDBPath(dbDefinition.locationUri),
+      collation = dbDefinition.collation
+    ))
   }
 
   def getDatabaseMetadata(db: String): CatalogDatabase = {

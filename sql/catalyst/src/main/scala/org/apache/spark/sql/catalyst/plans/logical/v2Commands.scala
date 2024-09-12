@@ -646,6 +646,17 @@ case class SetNamespaceLocation(
 }
 
 /**
+ * The logical plan of the ALTER (DATABASE|SCHEMA|NAMESPACE) ... DEFAULT COLLATION command.
+ */
+case class AlterNamespaceCollation(
+    namespace: LogicalPlan,
+    collation: String) extends UnaryCommand {
+  override def child: LogicalPlan = namespace
+  override protected def withNewChildInternal(newChild: LogicalPlan): AlterNamespaceCollation =
+    copy(namespace = newChild)
+}
+
+/**
  * The logical plan of the SHOW NAMESPACES command.
  */
 case class ShowNamespaces(
@@ -1475,6 +1486,7 @@ trait TableSpecBase {
   def provider: Option[String]
   def location: Option[String]
   def comment: Option[String]
+  def collation: Option[String]
   def serde: Option[SerdeInfo]
   def external: Boolean
 }
@@ -1485,6 +1497,7 @@ case class UnresolvedTableSpec(
     optionExpression: OptionList,
     location: Option[String],
     comment: Option[String],
+    collation: Option[String],
     serde: Option[SerdeInfo],
     external: Boolean) extends UnaryExpression with Unevaluable with TableSpecBase {
 
@@ -1530,10 +1543,11 @@ case class TableSpec(
     options: Map[String, String],
     location: Option[String],
     comment: Option[String],
+    collation: Option[String],
     serde: Option[SerdeInfo],
     external: Boolean) extends TableSpecBase {
   def withNewLocation(newLocation: Option[String]): TableSpec = {
-    TableSpec(properties, provider, options, newLocation, comment, serde, external)
+    TableSpec(properties, provider, options, newLocation, comment, collation, serde, external)
   }
 }
 

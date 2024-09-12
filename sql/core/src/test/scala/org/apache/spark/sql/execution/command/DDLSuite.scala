@@ -298,7 +298,7 @@ trait DDLSuiteBase extends SQLTestUtils {
   protected def createDatabase(catalog: SessionCatalog, name: String): Unit = {
     catalog.createDatabase(
       CatalogDatabase(
-        name, "", CatalogUtils.stringToURI(spark.sessionState.conf.warehousePath), Map()),
+        name, "", CatalogUtils.stringToURI(spark.sessionState.conf.warehousePath), None, Map()),
       ignoreIfExists = false)
   }
 

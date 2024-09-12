@@ -74,6 +74,7 @@ case class CreateDatabaseCommand(
     ifNotExists: Boolean,
     path: Option[String],
     comment: Option[String],
+    collation: Option[String],
     props: Map[String, String])
   extends LeafRunnableCommand {
 
@@ -84,6 +85,7 @@ case class CreateDatabaseCommand(
         databaseName,
         comment.getOrElse(""),
         path.map(CatalogUtils.stringToURI).getOrElse(catalog.getDefaultDBPath(databaseName)),
+        collation,
         props),
       ifNotExists)
     Seq.empty[Row]
@@ -143,6 +145,27 @@ case class AlterDatabasePropertiesCommand(
 }
 
 /**
+ * A command for users to set collation for a database
+ * If the database does not exist, an error message will be issued to indicate the database
+ * does not exist.
+ * The syntax of using this command in SQL is:
+ * {{{
+ *    ALTER (DATABASE|SCHEMA) database_name DEFAULT COLLATION name
+ * }}}
+ */
+case class AlterDatabaseCollationCommand(databaseName: String, collation: String)
+  extends LeafRunnableCommand {
+
+  override def run(sparkSession: SparkSession): Seq[Row] = {
+    val catalog = sparkSession.sessionState.catalog
+    val oldDb = catalog.getDatabaseMetadata(databaseName)
+    catalog.alterDatabase(oldDb.copy(collation = Some(collation)))
+
+    Seq.empty[Row]
+  }
+}
+
+/**
  * A command for users to set new location path for a database
  * If the database does not exist, an error message will be issued to indicate the database
  * does not exist.
@@ -187,6 +210,7 @@ case class DescribeDatabaseCommand(
       Row("Catalog Name", SESSION_CATALOG_NAME) ::
         Row("Database Name", dbMetadata.name) ::
         Row("Comment", dbMetadata.description) ::
+        Row("Collation", dbMetadata.collation) ::
         Row("Location", CatalogUtils.URIToString(dbMetadata.locationUri))::
         Row("Owner", allDbProperties.getOrElse(PROP_OWNER, "")) :: Nil
 
@@ -306,9 +330,12 @@ case class AlterTableSetPropertiesCommand(
     // This overrides old properties and update the comment parameter of CatalogTable
     // with the newly added/modified comment since CatalogTable also holds comment as its
     // direct property.
+    val newProperties = properties -- Seq(TableCatalog.PROP_COMMENT, TableCatalog.PROP_COLLATION)
     val newTable = table.copy(
-      properties = table.properties ++ properties,
-      comment = properties.get(TableCatalog.PROP_COMMENT).orElse(table.comment))
+      properties = table.properties ++ newProperties,
+      comment = properties.get(TableCatalog.PROP_COMMENT).orElse(table.comment),
+      collation = properties.get(TableCatalog.PROP_COLLATION).orElse(table.collation)
+    )
     catalog.alterTable(newTable)
     catalog.invalidateCachedTable(tableName)
     Seq.empty[Row]

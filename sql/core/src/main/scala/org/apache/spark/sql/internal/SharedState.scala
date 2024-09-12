@@ -154,6 +154,7 @@ private[sql] class SharedState(
         SQLConf.get.defaultDatabase,
         "default database",
         CatalogUtils.stringToURI(conf.get(WAREHOUSE_PATH)),
+        None,
         Map())
       // There may be another Spark application creating default database at the same time, here we
       // set `ignoreIfExists = true` to avoid `DatabaseAlreadyExists` exception.

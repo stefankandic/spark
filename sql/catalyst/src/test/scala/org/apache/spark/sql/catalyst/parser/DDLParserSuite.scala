@@ -70,6 +70,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       None)
 
     Seq(createSql, replaceSql).foreach { sql =>
@@ -96,6 +97,7 @@ class DDLParserSuite extends AnalysisTest {
         OptionList(Seq.empty),
         None,
         None,
+        None,
         None),
       expectedIfNotExists = true)
   }
@@ -114,6 +116,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       Some("parquet"),
       OptionList(Seq.empty),
+      None,
       None,
       None,
       None)
@@ -171,6 +174,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       None)
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -191,6 +195,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       Some("parquet"),
       OptionList(Seq.empty),
+      None,
       None,
       None,
       None)
@@ -237,6 +242,7 @@ class DDLParserSuite extends AnalysisTest {
         OptionList(Seq.empty),
         None,
         None,
+        None,
         None)
       Seq(createSql, replaceSql).foreach { sql =>
         testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -256,6 +262,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       Some("abc"),
+      None,
       None)
     Seq(createSql, replaceSql).foreach{ sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -276,6 +283,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       None)
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -294,6 +302,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       Some("/tmp/file"),
       None,
+      None,
       None)
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -310,6 +319,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       Some("parquet"),
       OptionList(Seq.empty),
+      None,
       None,
       None,
       None)
@@ -330,6 +340,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       None)
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -348,6 +359,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       None)
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -364,6 +376,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       Some("parquet"),
       OptionList(Seq.empty),
+      None,
       None,
       None,
       None)
@@ -439,6 +452,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       Some(SerdeInfo(storedAs = Some("parquet"))))
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -462,6 +476,7 @@ class DDLParserSuite extends AnalysisTest {
         Map.empty[String, String],
         None,
         OptionList(Seq.empty),
+        None,
         None,
         None,
         Some(SerdeInfo(storedAs = Some(format), serde = Some("customSerde"), serdeProperties = Map(
@@ -521,6 +536,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       Some(SerdeInfo(storedAs = Some("textfile"), serdeProperties = Map(
         "field.delim" -> ",", "serialization.format" -> ",", "escape.delim" -> "\\",
         "colelction.delim" -> "#", "mapkey.delim" -> "=", "line.delim" -> "\n"
@@ -572,6 +588,7 @@ class DDLParserSuite extends AnalysisTest {
       OptionList(Seq.empty),
       None,
       None,
+      None,
       Some(SerdeInfo(formatClasses = Some(FormatClasses("inFormat", "outFormat")))))
     Seq(createSql, replaceSql).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = false)
@@ -593,6 +610,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       None,
       OptionList(Seq.empty),
+      None,
       None,
       None,
       Some(SerdeInfo(
@@ -962,6 +980,7 @@ class DDLParserSuite extends AnalysisTest {
               ("c" -> Literal(true)))),
           None,
           None,
+          None,
           None),
         expectedIfNotExists = false)
     }
@@ -1017,6 +1036,7 @@ class DDLParserSuite extends AnalysisTest {
         OptionList(Seq.empty),
         Some("/user/external/page_view"),
         Some("This is the staging page view table"),
+        None,
         None)
     Seq(s1, s2, s3, s4).foreach { sql =>
       testCreateOrReplaceDdl(sql, expectedTableSpec, expectedIfNotExists = true)
@@ -2495,6 +2515,7 @@ class DDLParserSuite extends AnalysisTest {
       options: OptionList,
       location: Option[String],
       comment: Option[String],
+      collation: Option[String],
       serdeInfo: Option[SerdeInfo],
       external: Boolean = false)
 
@@ -2512,6 +2533,7 @@ class DDLParserSuite extends AnalysisTest {
             tableSpec.optionExpression,
             tableSpec.location,
             tableSpec.comment,
+            tableSpec.collation,
             tableSpec.serde,
             tableSpec.external)
         case replace: ReplaceTable =>
@@ -2525,6 +2547,7 @@ class DDLParserSuite extends AnalysisTest {
             tableSpec.optionExpression,
             tableSpec.location,
             tableSpec.comment,
+            tableSpec.collation,
             tableSpec.serde)
         case ctas: CreateTableAsSelect =>
           val tableSpec = ctas.tableSpec.asInstanceOf[UnresolvedTableSpec]
@@ -2537,6 +2560,7 @@ class DDLParserSuite extends AnalysisTest {
             tableSpec.optionExpression,
             tableSpec.location,
             tableSpec.comment,
+            tableSpec.collation,
             tableSpec.serde,
             tableSpec.external)
         case rtas: ReplaceTableAsSelect =>
@@ -2550,6 +2574,7 @@ class DDLParserSuite extends AnalysisTest {
             tableSpec.optionExpression,
             tableSpec.location,
             tableSpec.comment,
+            tableSpec.collation,
             tableSpec.serde)
         case other =>
           fail(s"Expected to parse Create, CTAS, Replace, or RTAS plan" +
@@ -2585,6 +2610,7 @@ class DDLParserSuite extends AnalysisTest {
       Map.empty[String, String],
       None,
       OptionList(Seq.empty),
+      None,
       None,
       None,
       None)
@@ -2653,7 +2679,7 @@ class DDLParserSuite extends AnalysisTest {
     val createTableResult =
       CreateTable(UnresolvedIdentifier(Seq("my_tab")), columnsWithDefaultValue,
         Seq.empty[Transform], UnresolvedTableSpec(Map.empty[String, String], Some("parquet"),
-         OptionList(Seq.empty), None, None, None, false), false)
+         OptionList(Seq.empty), None, None, None, None, false), false)
     // Parse the CREATE TABLE statement twice, swapping the order of the NOT NULL and DEFAULT
     // options, to make sure that the parser accepts any ordering of these options.
     comparePlans(parsePlan(
@@ -2666,7 +2692,7 @@ class DDLParserSuite extends AnalysisTest {
       "b STRING NOT NULL DEFAULT 'abc') USING parquet"),
       ReplaceTable(UnresolvedIdentifier(Seq("my_tab")), columnsWithDefaultValue,
         Seq.empty[Transform], UnresolvedTableSpec(Map.empty[String, String], Some("parquet"),
-          OptionList(Seq.empty), None, None, None, false), false))
+          OptionList(Seq.empty), None, None, None, None, false), false))
     // These ALTER TABLE statements should parse successfully.
     comparePlans(
       parsePlan("ALTER TABLE t1 ADD COLUMN x int NOT NULL DEFAULT 42"),
@@ -2826,12 +2852,12 @@ class DDLParserSuite extends AnalysisTest {
       "CREATE TABLE my_tab(a INT, b INT NOT NULL GENERATED ALWAYS AS (a+1)) USING parquet"),
       CreateTable(UnresolvedIdentifier(Seq("my_tab")), columnsWithGenerationExpr,
         Seq.empty[Transform], UnresolvedTableSpec(Map.empty[String, String], Some("parquet"),
-          OptionList(Seq.empty), None, None, None, false), false))
+          OptionList(Seq.empty), None, None, None, None, false), false))
     comparePlans(parsePlan(
       "REPLACE TABLE my_tab(a INT, b INT NOT NULL GENERATED ALWAYS AS (a+1)) USING parquet"),
       ReplaceTable(UnresolvedIdentifier(Seq("my_tab")), columnsWithGenerationExpr,
         Seq.empty[Transform], UnresolvedTableSpec(Map.empty[String, String], Some("parquet"),
-          OptionList(Seq.empty), None, None, None, false), false))
+          OptionList(Seq.empty), None, None, None, None, false), false))
     // Two generation expressions
     checkError(
       exception = parseException("CREATE TABLE my_tab(a INT, " +
