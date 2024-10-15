@@ -425,7 +425,11 @@ abstract class QueryPlan[PlanType <: QueryPlan[PlanType]]
     }
   }
 
-  lazy val schema: StructType = DataTypeUtils.fromAttributes(output)
+  lazy val schema: StructType = {
+    //TODO: remove
+    val ret = DataTypeUtils.fromAttributes(output)
+    ret
+  }
 
   /** Returns the output schema in the tree format. */
   def schemaString: String = schema.treeString

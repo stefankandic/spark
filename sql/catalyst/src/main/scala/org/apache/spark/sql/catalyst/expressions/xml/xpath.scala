@@ -23,7 +23,6 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.Cast._
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.util.GenericArrayData
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.types.StringTypeWithCaseAccentSensitivity
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
@@ -222,9 +221,10 @@ case class XPathDouble(xml: Expression, path: Expression) extends XPathExtract {
   since = "2.0.0",
   group = "xml_funcs")
 // scalastyle:on line.size.limit
-case class XPathString(xml: Expression, path: Expression) extends XPathExtract {
+case class XPathString(xml: Expression, path: Expression)
+  extends XPathExtract
+    with DefaultStringTypeProducingExpression {
   override def prettyName: String = "xpath_string"
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   override def nullSafeEval(xml: Any, path: Any): Any = {
     val ret = xpathUtil.evalString(xml.asInstanceOf[UTF8String].toString, pathString)
@@ -248,9 +248,11 @@ case class XPathString(xml: Expression, path: Expression) extends XPathExtract {
   since = "2.0.0",
   group = "xml_funcs")
 // scalastyle:on line.size.limit
-case class XPathList(xml: Expression, path: Expression) extends XPathExtract {
+case class XPathList(xml: Expression, path: Expression)
+  extends XPathExtract
+    with DefaultStringTypeProducingExpression {
   override def prettyName: String = "xpath"
-  override def dataType: DataType = ArrayType(SQLConf.get.defaultStringType)
+  override def dataType: DataType = ArrayType(DefaultStringType)
 
   override def nullSafeEval(xml: Any, path: Any): Any = {
     val nodeList = xpathUtil.evalNodeList(xml.asInstanceOf[UTF8String].toString, pathString)

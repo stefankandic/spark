@@ -26,7 +26,6 @@ import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodeGe
 import org.apache.spark.sql.catalyst.expressions.codegen.Block.BlockHelper
 import org.apache.spark.sql.catalyst.util.ToNumberParser
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.types.StringTypeWithCaseAccentSensitivity
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType, DatetimeType, Decimal, DecimalType, StringType}
 import org.apache.spark.unsafe.types.UTF8String
@@ -273,7 +272,10 @@ object ToCharacterBuilder extends ExpressionBuilder {
 }
 
 case class ToCharacter(left: Expression, right: Expression)
-  extends BinaryExpression with ImplicitCastInputTypes with NullIntolerant {
+  extends BinaryExpression
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes
+    with NullIntolerant {
   private lazy val numberFormatter = {
     val value = right.eval()
     if (value != null) {
@@ -283,7 +285,6 @@ case class ToCharacter(left: Expression, right: Expression)
     }
   }
 
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def inputTypes: Seq[AbstractDataType] =
     Seq(DecimalType, StringTypeWithCaseAccentSensitivity)
   override def checkInputDataTypes(): TypeCheckResult = {

@@ -63,7 +63,9 @@ trait NoThrow
   since = "1.1.0",
   group = "array_funcs")
 case class CreateArray(children: Seq[Expression], useStringTypeWhenEmpty: Boolean)
-  extends Expression with NoThrow {
+  extends Expression
+    with NoThrow
+    with DefaultStringTypeProducingExpression {
 
   def this(children: Seq[Expression]) = {
     this(children, SQLConf.get.getConf(SQLConf.LEGACY_CREATE_EMPTY_COLLECTION_USING_STRING_TYPE))
@@ -79,7 +81,7 @@ case class CreateArray(children: Seq[Expression], useStringTypeWhenEmpty: Boolea
 
   private val defaultElementType: DataType = {
     if (useStringTypeWhenEmpty) {
-      SQLConf.get.defaultStringType
+      DefaultStringType
     } else {
       NullType
     }
@@ -185,7 +187,9 @@ private [sql] object GenArrayData {
   since = "2.0.0",
   group = "map_funcs")
 case class CreateMap(children: Seq[Expression], useStringTypeWhenEmpty: Boolean)
-  extends Expression with NoThrow {
+  extends Expression
+    with NoThrow
+    with DefaultStringTypeProducingExpression {
 
   def this(children: Seq[Expression]) = {
     this(children, SQLConf.get.getConf(SQLConf.LEGACY_CREATE_EMPTY_COLLECTION_USING_STRING_TYPE))
@@ -196,7 +200,7 @@ case class CreateMap(children: Seq[Expression], useStringTypeWhenEmpty: Boolean)
 
   private val defaultElementType: DataType = {
     if (useStringTypeWhenEmpty) {
-      SQLConf.get.defaultStringType
+      DefaultStringType
     } else {
       NullType
     }
@@ -351,10 +355,12 @@ case class MapFromArrays(left: Expression, right: Expression)
  * and as its name suggests it is a temporary place holder until we're able to determine the
  * actual attribute name.
  */
-case object NamePlaceholder extends LeafExpression with Unevaluable {
+case object NamePlaceholder
+  extends LeafExpression
+    with Unevaluable
+    with DefaultStringTypeProducingExpression {
   override lazy val resolved: Boolean = false
   override def nullable: Boolean = false
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def prettyName: String = "NamePlaceholder"
   override def toString: String = prettyName
 }

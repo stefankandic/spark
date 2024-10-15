@@ -114,7 +114,7 @@ case class Collation(child: Expression)
   override lazy val replacement: Expression = {
     val collationId = child.dataType.asInstanceOf[StringType].collationId
     val collationName = CollationFactory.fetchCollation(collationId).collationName
-    Literal.create(collationName, SQLConf.get.defaultStringType)
+    Literal.create(collationName, DefaultStringType)
   }
   override def inputTypes: Seq[AbstractDataType] =
     Seq(StringTypeWithCaseAccentSensitivity(/* supportsTrimCollation = */ true))

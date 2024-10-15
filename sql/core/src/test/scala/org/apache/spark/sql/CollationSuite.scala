@@ -34,7 +34,7 @@ import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAg
 import org.apache.spark.sql.execution.columnar.InMemoryTableScanExec
 import org.apache.spark.sql.execution.joins._
 import org.apache.spark.sql.internal.{SqlApiConf, SQLConf}
-import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{ArrayType, DefaultStringType, MapType, StringType, StructField, StructType}
 
 class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
   protected val v2Source = classOf[FakeV2ProviderWithCustomSchema].getName
@@ -988,12 +988,16 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
   }
 
   test("SPARK-47431: Create table with UTF8_BINARY, make sure collation persists on read") {
-    withTable("t") {
+    val t = DefaultStringType
+    val x1 = StringType == DefaultStringType
+
+    withTable("t23") {
       withSQLConf(SqlApiConf.DEFAULT_COLLATION -> "UTF8_BINARY") {
         sql("CREATE TABLE t(c1 STRING) USING PARQUET")
         sql("INSERT INTO t VALUES ('a')")
         checkAnswer(sql("SELECT collation(c1) FROM t"), Seq(Row("UTF8_BINARY")))
       }
+      val xx = spark.table("t").schema
       withSQLConf(SqlApiConf.DEFAULT_COLLATION -> "UNICODE") {
         checkAnswer(sql("SELECT collation(c1) FROM t"), Seq(Row("UTF8_BINARY")))
       }
@@ -1993,5 +1997,10 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
 
     checkAnswer(sql("SELECT NAME FROM collations() WHERE ICU_VERSION is null"),
       Seq(Row("UTF8_BINARY"), Row("UTF8_LCASE")))
+  }
+
+  test("asdf") {
+    val st = DefaultStringType
+    assert(st.collationId == 0)
   }
 }

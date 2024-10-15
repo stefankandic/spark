@@ -130,13 +130,14 @@ private[this] object SharedFactory {
   group = "json_funcs",
   since = "1.5.0")
 case class GetJsonObject(json: Expression, path: Expression)
-  extends BinaryExpression with ExpectsInputTypes {
+  extends BinaryExpression
+    with DefaultStringTypeProducingExpression
+    with ExpectsInputTypes {
 
   override def left: Expression = json
   override def right: Expression = path
   override def inputTypes: Seq[AbstractDataType] =
     Seq(StringTypeWithCaseAccentSensitivity, StringTypeWithCaseAccentSensitivity)
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def nullable: Boolean = true
   override def prettyName: String = "get_json_object"
 
@@ -779,6 +780,7 @@ case class StructsToJson(
     child: Expression,
     timeZoneId: Option[String] = None)
   extends UnaryExpression
+  with DefaultStringTypeProducingExpression
   with TimeZoneAwareExpression
   with CodegenFallback
   with ExpectsInputTypes
@@ -837,8 +839,6 @@ case class StructsToJson(
     }
   }
 
-  override def dataType: DataType = SQLConf.get.defaultStringType
-
   override def checkInputDataTypes(): TypeCheckResult = inputSchema match {
     case dt @ (_: StructType | _: MapType | _: ArrayType | _: VariantType) =>
       JacksonUtils.verifyType(prettyName, dt)
@@ -878,15 +878,16 @@ case class StructsToJson(
 case class SchemaOfJson(
     child: Expression,
     options: Map[String, String])
-  extends UnaryExpression with CodegenFallback with QueryErrorsBase {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with CodegenFallback
+    with QueryErrorsBase {
 
   def this(child: Expression) = this(child, Map.empty[String, String])
 
   def this(child: Expression, options: Expression) = this(
       child = child,
       options = ExprUtils.convertToMapData(options))
-
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   override def nullable: Boolean = false
 
@@ -933,7 +934,7 @@ case class SchemaOfJson(
             .getOrElse(ArrayType(StructType(Nil), containsNull = at.containsNull))
         case other: DataType =>
           jsonInferSchema.canonicalizeType(other, jsonOptions).getOrElse(
-            SQLConf.get.defaultStringType)
+            DefaultStringType)
       }
     }
 
@@ -1015,11 +1016,12 @@ case class LengthOfJsonArray(child: Expression)
 )
 case class JsonObjectKeys(child: Expression)
   extends UnaryExpression
+  with DefaultStringTypeProducingExpression
   with ExpectsInputTypes
   with RuntimeReplaceable {
 
   override def inputTypes: Seq[AbstractDataType] = Seq(StringTypeWithCaseAccentSensitivity)
-  override def dataType: DataType = ArrayType(SQLConf.get.defaultStringType)
+  override def dataType: DataType = ArrayType(DefaultStringType)
   override def nullable: Boolean = true
   override def prettyName: String = "json_object_keys"
 

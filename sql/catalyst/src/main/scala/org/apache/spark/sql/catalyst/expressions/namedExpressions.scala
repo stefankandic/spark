@@ -275,6 +275,10 @@ case class AttributeReference(
     val qualifier: Seq[String] = Seq.empty[String])
   extends Attribute with Unevaluable {
 
+  if (name == "c1") {
+    val x = 3
+  }
+
   override lazy val treePatternBits: BitSet = AttributeReferenceTreeBits.bits
 
   /**

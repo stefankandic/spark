@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.trees.UnaryLike
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.internal.types.StringTypeWithCaseAccentSensitivity
-import org.apache.spark.sql.types.{AbstractDataType, BooleanType, DataType}
+import org.apache.spark.sql.types.{AbstractDataType, BooleanType, DefaultStringType}
 import org.apache.spark.unsafe.types.UTF8String
 
 // scalastyle:off line.size.limit
@@ -56,7 +56,7 @@ case class UrlEncode(child: Expression)
   override lazy val replacement: Expression =
     StaticInvoke(
       UrlCodec.getClass,
-      SQLConf.get.defaultStringType,
+      DefaultStringType,
       "encode",
       Seq(child),
       Seq(StringTypeWithCaseAccentSensitivity))
@@ -95,7 +95,7 @@ case class UrlDecode(child: Expression, failOnError: Boolean = true)
   override lazy val replacement: Expression =
     StaticInvoke(
       UrlCodec.getClass,
-      SQLConf.get.defaultStringType,
+      DefaultStringType,
       "decode",
       Seq(child, Literal(failOnError)),
       Seq(StringTypeWithCaseAccentSensitivity, BooleanType))
@@ -186,13 +186,14 @@ object ParseUrl {
   since = "2.0.0",
   group = "url_funcs")
 case class ParseUrl(children: Seq[Expression], failOnError: Boolean = SQLConf.get.ansiEnabled)
-  extends Expression with ExpectsInputTypes with CodegenFallback {
+  extends Expression
+    with DefaultStringTypeProducingExpression
+    with ExpectsInputTypes with CodegenFallback {
   def this(children: Seq[Expression]) = this(children, SQLConf.get.ansiEnabled)
 
   override def nullable: Boolean = true
   override def inputTypes: Seq[AbstractDataType] =
     Seq.fill(children.size)(StringTypeWithCaseAccentSensitivity)
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def prettyName: String = "parse_url"
 
   // If the url is a constant, cache the URL object so that we don't need to convert url

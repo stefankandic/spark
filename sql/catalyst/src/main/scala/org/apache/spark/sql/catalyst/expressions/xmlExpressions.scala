@@ -149,15 +149,15 @@ case class XmlToStructs(
 case class SchemaOfXml(
     child: Expression,
     options: Map[String, String])
-  extends UnaryExpression with CodegenFallback with QueryErrorsBase {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with CodegenFallback with QueryErrorsBase {
 
   def this(child: Expression) = this(child, Map.empty[String, String])
 
   def this(child: Expression, options: Expression) = this(
     child = child,
     options = ExprUtils.convertToMapData(options))
-
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   override def nullable: Boolean = false
 
@@ -202,7 +202,7 @@ case class SchemaOfXml(
           .map(ArrayType(_, containsNull = at.containsNull))
           .getOrElse(ArrayType(StructType(Nil), containsNull = at.containsNull))
       case other: DataType =>
-        xmlInferSchema.canonicalizeType(other).getOrElse(SQLConf.get.defaultStringType)
+        xmlInferSchema.canonicalizeType(other).getOrElse(DefaultStringType)
     }
 
     UTF8String.fromString(dataType.sql)
@@ -240,6 +240,7 @@ case class StructsToXml(
     child: Expression,
     timeZoneId: Option[String] = None)
   extends UnaryExpression
+  with DefaultStringTypeProducingExpression
   with TimeZoneAwareExpression
   with ExpectsInputTypes
   with NullIntolerant {
@@ -294,8 +295,6 @@ case class StructsToXml(
       gen.write(row.asInstanceOf[InternalRow])
       getAndReset()
   }
-
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   override def withTimeZone(timeZoneId: String): TimeZoneAwareExpression =
     copy(timeZoneId = Option(timeZoneId))

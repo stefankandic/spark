@@ -282,8 +282,10 @@ case class ConcatWs(children: Seq[Expression])
 // scalastyle:on line.size.limit
 case class Elt(
     children: Seq[Expression],
-    failOnError: Boolean = SQLConf.get.ansiEnabled) extends Expression
-  with SupportQueryContext {
+    failOnError: Boolean = SQLConf.get.ansiEnabled)
+  extends Expression
+    with DefaultStringTypeProducingExpression
+    with SupportQueryContext {
 
   def this(children: Seq[Expression]) = this(children, SQLConf.get.ansiEnabled)
 
@@ -293,8 +295,15 @@ case class Elt(
   /** This expression is always nullable because it returns null if index is out of range. */
   override def nullable: Boolean = true
 
-  override def dataType: DataType =
-    inputExprs.map(_.dataType).headOption.getOrElse(SQLConf.get.defaultStringType)
+  override def dataType: DataType = if (producesDefaultStringType) {
+    DefaultStringType
+  } else {
+    inputExprs.head.dataType
+  }
+
+  // only if the input is empty this expression produces a default string type
+  override def producesDefaultStringType: Boolean =
+    inputExprs.map(_.dataType).isEmpty
 
   override def checkInputDataTypes(): TypeCheckResult = {
     if (children.size < 2) {
@@ -2148,9 +2157,10 @@ case class StringRepeat(str: Expression, times: Expression)
   since = "1.5.0",
   group = "string_funcs")
 case class StringSpace(child: Expression)
-  extends UnaryExpression with ImplicitCastInputTypes with NullIntolerant {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes with NullIntolerant {
 
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def inputTypes: Seq[DataType] = Seq(IntegerType)
 
   override def nullSafeEval(s: Any): Any = {
@@ -2595,9 +2605,9 @@ case class Levenshtein(
   since = "1.5.0",
   group = "string_funcs")
 case class SoundEx(child: Expression)
-  extends UnaryExpression with ExpectsInputTypes with NullIntolerant {
-
-  override def dataType: DataType = SQLConf.get.defaultStringType
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with ExpectsInputTypes with NullIntolerant {
 
   override def inputTypes: Seq[AbstractDataType] = Seq(StringTypeWithCaseAccentSensitivity)
 
@@ -2673,9 +2683,10 @@ case class Ascii(child: Expression)
   group = "string_funcs")
 // scalastyle:on line.size.limit
 case class Chr(child: Expression)
-  extends UnaryExpression with ImplicitCastInputTypes with NullIntolerant {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes with NullIntolerant {
 
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def inputTypes: Seq[DataType] = Seq(LongType)
 
   protected override def nullSafeEval(lon: Any): Any = {
@@ -2722,11 +2733,12 @@ case class Chr(child: Expression)
   since = "1.5.0",
   group = "string_funcs")
 case class Base64(child: Expression, chunkBase64: Boolean)
-  extends UnaryExpression with RuntimeReplaceable with ImplicitCastInputTypes {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with RuntimeReplaceable with ImplicitCastInputTypes {
 
   def this(expr: Expression) = this(expr, SQLConf.get.chunkBase64StringEnabled)
 
-  override val dataType: DataType = SQLConf.get.defaultStringType
   override def inputTypes: Seq[DataType] = Seq(BinaryType)
 
   override lazy val replacement: Expression = StaticInvoke(
@@ -2880,7 +2892,7 @@ object Decode {
         val input = params.head
         val other = params.tail
         val itr = other.iterator
-        var default: Expression = Literal.create(null, SQLConf.get.defaultStringType)
+        var default: Expression = Literal.create(null, DefaultStringType)
         val branches = ArrayBuffer.empty[(Expression, Expression)]
         while (itr.hasNext) {
           val search = itr.next()
@@ -2947,12 +2959,13 @@ case class StringDecode(
     charset: Expression,
     legacyCharsets: Boolean,
     legacyErrorAction: Boolean)
-  extends RuntimeReplaceable with ImplicitCastInputTypes {
+  extends RuntimeReplaceable
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes {
 
   def this(bin: Expression, charset: Expression) =
     this(bin, charset, SQLConf.get.legacyJavaCharsets, SQLConf.get.legacyCodingErrorAction)
 
-  override val dataType: DataType = SQLConf.get.defaultStringType
   override def inputTypes: Seq[AbstractDataType] =
     Seq(BinaryType, StringTypeWithCaseAccentSensitivity)
   override def prettyName: String = "decode"
@@ -2960,7 +2973,7 @@ case class StringDecode(
 
   override lazy val replacement: Expression = StaticInvoke(
     classOf[StringDecode],
-    SQLConf.get.defaultStringType,
+    DefaultStringType,
     "decode",
     Seq(bin, charset, Literal(legacyCharsets), Literal(legacyErrorAction)),
     Seq(BinaryType, StringTypeWithCaseAccentSensitivity, BooleanType, BooleanType))
@@ -3198,11 +3211,12 @@ case class ToBinary(
   since = "1.5.0",
   group = "string_funcs")
 case class FormatNumber(x: Expression, d: Expression)
-  extends BinaryExpression with ExpectsInputTypes with NullIntolerant {
+  extends BinaryExpression
+    with DefaultStringTypeProducingExpression
+    with ExpectsInputTypes with NullIntolerant {
 
   override def left: Expression = x
   override def right: Expression = d
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def nullable: Boolean = true
   override def inputTypes: Seq[AbstractDataType] =
     Seq(NumericType, TypeCollection(IntegerType, StringTypeWithCaseAccentSensitivity))

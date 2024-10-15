@@ -963,7 +963,7 @@ class AstBuilder extends DataTypeAstBuilder
         } else {
           // TODO For v2 commands, we will cast the string back to its actual value,
           //  which is a waste and can be improved in the future.
-          Cast(l, conf.defaultStringType, Some(conf.sessionLocalTimeZone)).eval().toString
+          Cast(l, DefaultStringType, Some(conf.sessionLocalTimeZone)).eval().toString
         }
       case other =>
         throw new SparkIllegalArgumentException(
@@ -3266,7 +3266,7 @@ class AstBuilder extends DataTypeAstBuilder
    * Create a String literal expression.
    */
   override def visitStringLiteral(ctx: StringLiteralContext): Literal = withOrigin(ctx) {
-    Literal.create(createString(ctx), conf.defaultStringType)
+    Literal.create(createString(ctx), DefaultStringType)
   }
 
   /**

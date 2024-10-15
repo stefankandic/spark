@@ -1002,10 +1002,13 @@ case class ToRadians(child: Expression) extends UnaryMathExpression(math.toRadia
   group = "math_funcs")
 // scalastyle:on line.size.limit
 case class Bin(child: Expression)
-  extends UnaryExpression with ImplicitCastInputTypes with NullIntolerant with Serializable {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes
+    with NullIntolerant
+    with Serializable {
 
   override def inputTypes: Seq[DataType] = Seq(LongType)
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   protected override def nullSafeEval(input: Any): Any =
     UTF8String.toBinaryString(input.asInstanceOf[Long])
@@ -1111,15 +1114,21 @@ object Hex {
   since = "1.5.0",
   group = "math_funcs")
 case class Hex(child: Expression)
-  extends UnaryExpression with ImplicitCastInputTypes with NullIntolerant {
+  extends UnaryExpression
+    with DefaultStringTypeProducingExpression
+    with ImplicitCastInputTypes with NullIntolerant {
 
   override def inputTypes: Seq[AbstractDataType] =
     Seq(TypeCollection(LongType, BinaryType, StringTypeWithCaseAccentSensitivity))
 
-  override def dataType: DataType = child.dataType match {
-    case st: StringType => st
-    case _ => SQLConf.get.defaultStringType
+  override def dataType: DataType = if (producesDefaultStringType) {
+    DefaultStringType
+  } else {
+    child.dataType
   }
+
+  // only if child is not of StringType the result if a default string type
+  override def producesDefaultStringType: Boolean = !child.dataType.isInstanceOf[StringType]
 
   protected override def nullSafeEval(num: Any): Any = child.dataType match {
     case LongType => Hex.hex(num.asInstanceOf[Long])

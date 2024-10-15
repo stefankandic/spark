@@ -48,6 +48,10 @@ case class HadoopFsRelation(
     options: Map[String, String])(val sparkSession: SparkSession)
   extends BaseRelation with FileRelation {
 
+  if (dataSchema.exists(_.name == "c1")) {
+    val x = 3
+  }
+
   override def sqlContext: SQLContext = sparkSession.sqlContext
 
   // When data and partition schemas have overlapping columns, the output

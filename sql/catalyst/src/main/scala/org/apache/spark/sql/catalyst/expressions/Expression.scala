@@ -1435,3 +1435,13 @@ case class MultiCommutativeOp(
 
   override protected final def otherCopyArgs: Seq[AnyRef] = originalRoot :: Nil
 }
+
+trait DefaultStringTypeProducingExpression extends Expression {
+  override def dataType: DataType = DefaultStringType
+
+  /**
+   * Since some functions don't always return the default string type, we need
+   * a mechanism to tell that. This method must always be in sync with the `dataType` method.
+   */
+  def producesDefaultStringType: Boolean = true
+}

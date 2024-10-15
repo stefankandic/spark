@@ -21,6 +21,7 @@ import org.json4s.JsonAST.{JString, JValue}
 
 import org.apache.spark.annotation.Stable
 import org.apache.spark.sql.catalyst.util.CollationFactory
+import org.apache.spark.sql.internal.SqlApiConf
 
 /**
  * The data type representing `String` values. Please use the singleton `DataTypes.StringType`.
@@ -30,7 +31,9 @@ import org.apache.spark.sql.catalyst.util.CollationFactory
  *   The id of collation for this StringType.
  */
 @Stable
-class StringType private (val collationId: Int) extends AtomicType with Serializable {
+class StringType (val _collationId: Int) extends AtomicType with Serializable {
+
+  def collationId: Int = _collationId
 
   /**
    * Support for Binary Equality implies that strings are considered equal only if they are byte
@@ -105,4 +108,8 @@ case object StringType extends StringType(0) {
     val collationId = CollationFactory.collationNameToId(collation)
     new StringType(collationId)
   }
+}
+
+case object DefaultStringType extends StringType(0) {
+  override def collationId: Int = SqlApiConf.get.defaultStringType.collationId
 }

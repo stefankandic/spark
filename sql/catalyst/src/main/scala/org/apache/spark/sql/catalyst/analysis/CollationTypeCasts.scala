@@ -22,10 +22,9 @@ import javax.annotation.Nullable
 import scala.annotation.tailrec
 
 import org.apache.spark.sql.catalyst.analysis.TypeCoercion.{hasStringType, haveSameType}
-import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.{DefaultStringTypeProducingExpression, _}
 import org.apache.spark.sql.errors.QueryCompilationErrors
-import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{ArrayType, DataType, MapType, StringType}
+import org.apache.spark.sql.types._
 
 object CollationTypeCasts extends TypeCoercionRule {
   override val transform: PartialFunction[Expression, Expression] = {
@@ -194,8 +193,26 @@ object CollationTypeCasts extends TypeCoercionRule {
           throw QueryCompilationErrors.implicitCollationMismatchError()
         }
         else {
-          implicitTypes.headOption.map(StringType(_)).getOrElse(SQLConf.get.defaultStringType)
+          implicitTypes.headOption.map(StringType(_)).getOrElse(DefaultStringType)
         }
     }
+  }
+
+  private def isCollationStrengthImplicit(expr: Expression): Boolean =
+    !isCollationStrengthExplicit(expr) && isCollationStrengthDefault(expr)
+
+  private def isCollationStrengthExplicit(expr: Expression): Boolean = expr match {
+    case _: Collate => true
+    case _ => false
+  }
+
+  private def isCollationStrengthDefault(expr: Expression): Boolean = expr match {
+    case Literal(_, _: StringType) =>
+      true
+    case e: DefaultStringTypeProducingExpression =>
+      e.producesDefaultStringType
+    case cast: Cast if cast.getTagValue(Cast.USER_SPECIFIED_CAST).isDefined =>
+      !cast.child.dataType.isInstanceOf[StringType]
+    case _ => false
   }
 }

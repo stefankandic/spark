@@ -110,9 +110,11 @@ trait TimestampFormatterHelper extends TimeZoneAwareExpression {
   """,
   group = "datetime_funcs",
   since = "3.1.0")
-case class CurrentTimeZone() extends LeafExpression with Unevaluable {
+case class CurrentTimeZone()
+  extends LeafExpression
+    with DefaultStringTypeProducingExpression
+    with Unevaluable {
   override def nullable: Boolean = false
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def prettyName: String = "current_timezone"
   final override val nodePatterns: Seq[TreePattern] = Seq(CURRENT_LIKE)
 }
@@ -927,12 +929,13 @@ case class MonthName(child: Expression) extends GetDateField {
   """,
   group = "datetime_funcs",
   since = "4.0.0")
-case class DayName(child: Expression) extends GetDateField {
+case class DayName(child: Expression)
+  extends GetDateField
+    with DefaultStringTypeProducingExpression {
   override val func = DateTimeUtils.getDayName
   override val funcName = "getDayName"
 
   override def inputTypes: Seq[AbstractDataType] = Seq(DateType)
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override protected def withNewChildInternal(newChild: Expression): DayName =
     copy(child = newChild)
 }
@@ -955,12 +958,13 @@ case class DayName(child: Expression) extends GetDateField {
   since = "1.5.0")
 // scalastyle:on line.size.limit
 case class DateFormatClass(left: Expression, right: Expression, timeZoneId: Option[String] = None)
-  extends BinaryExpression with TimestampFormatterHelper with ImplicitCastInputTypes
+  extends BinaryExpression
+    with DefaultStringTypeProducingExpression
+    with TimestampFormatterHelper
+    with ImplicitCastInputTypes
     with NullIntolerant {
 
   def this(left: Expression, right: Expression) = this(left, right, None)
-
-  override def dataType: DataType = SQLConf.get.defaultStringType
 
   override def inputTypes: Seq[AbstractDataType] =
     Seq(TimestampType, StringTypeWithCaseAccentSensitivity)
@@ -1428,7 +1432,10 @@ abstract class UnixTime extends ToTimestamp {
   since = "1.5.0")
 // scalastyle:on line.size.limit
 case class FromUnixTime(sec: Expression, format: Expression, timeZoneId: Option[String] = None)
-  extends BinaryExpression with TimestampFormatterHelper with ImplicitCastInputTypes
+  extends BinaryExpression
+    with DefaultStringTypeProducingExpression
+    with TimestampFormatterHelper
+    with ImplicitCastInputTypes
     with NullIntolerant {
 
   def this(sec: Expression, format: Expression) = this(sec, format, None)
@@ -1442,7 +1449,6 @@ case class FromUnixTime(sec: Expression, format: Expression, timeZoneId: Option[
     this(unix, Literal(TimestampFormatter.defaultPattern()))
   }
 
-  override def dataType: DataType = SQLConf.get.defaultStringType
   override def nullable: Boolean = true
 
   override def inputTypes: Seq[AbstractDataType] =
