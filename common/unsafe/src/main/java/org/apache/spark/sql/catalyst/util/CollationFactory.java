@@ -33,6 +33,7 @@ import com.ibm.icu.util.ULocale;
 import com.ibm.icu.util.VersionInfo;
 
 import org.apache.spark.SparkException;
+import org.apache.spark.SparkRuntimeException;
 import org.apache.spark.unsafe.types.UTF8String;
 
 /**
@@ -349,6 +350,10 @@ public final class CollationFactory {
         // instance.
         assert (collationId >= 0 && getDefinitionOrigin(collationId)
           == DefinitionOrigin.PREDEFINED);
+//        if (collationId == -1) {
+//          throw new SparkRuntimeException("COLLATION_MISMATCH.IMPLICIT");
+//        }
+
         if (collationId == UTF8_BINARY_COLLATION_ID) {
           // Skip cache.
           return CollationSpecUTF8.UTF8_BINARY_COLLATION;
@@ -1084,15 +1089,13 @@ public final class CollationFactory {
     return Collation.CollationSpec.collationNameToId(collationName);
   }
 
-  /**
-   * Returns whether the ICU collation is not Case Sensitive Accent Insensitive
-   * for the given collation id.
-   * This method is used in expressions which do not support CS_AI collations.
-   */
-  public static boolean isCaseSensitiveAndAccentInsensitive(int collationId) {
+  public static boolean isCaseInsensitive(int collationId) {
     return Collation.CollationSpecICU.fromCollationId(collationId).caseSensitivity ==
-            Collation.CollationSpecICU.CaseSensitivity.CS &&
-            Collation.CollationSpecICU.fromCollationId(collationId).accentSensitivity ==
+            Collation.CollationSpecICU.CaseSensitivity.CI;
+  }
+
+  public static boolean isAccentInsensitive(int collationId) {
+    return Collation.CollationSpecICU.fromCollationId(collationId).accentSensitivity ==
             Collation.CollationSpecICU.AccentSensitivity.AI;
   }
 

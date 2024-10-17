@@ -33,7 +33,9 @@ import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanHelper
 import org.apache.spark.sql.execution.aggregate.{HashAggregateExec, ObjectHashAggregateExec}
 import org.apache.spark.sql.execution.columnar.InMemoryTableScanExec
 import org.apache.spark.sql.execution.joins._
-import org.apache.spark.sql.internal.{SqlApiConf, SQLConf}
+import org.apache.spark.sql.expressions.Window.orderBy
+import org.apache.spark.sql.functions.dense_rank
+import org.apache.spark.sql.internal.{SQLConf, SqlApiConf}
 import org.apache.spark.sql.types.{ArrayType, MapType, StringType, StructField, StructType}
 
 class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
@@ -1766,5 +1768,51 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
 
     checkAnswer(sql("SELECT NAME FROM collations() WHERE ICU_VERSION is null"),
       Seq(Row("UTF8_BINARY"), Row("UTF8_LCASE")))
+  }
+
+  test("asdf") {
+    val tblName = "tbl2"
+    withTable(tblName) {
+      sql(s"create table $tblName (a string collate utf8_lcase, b string) using parquet")
+      sql(s"insert into $tblName values ('a', 'b')")
+
+//      sql(s"SELECT distinct reverse(a || b) FROM $tblName").show()
+      sql(s"SELECT instr('a', reverse(a || b)) FROM $tblName").show()
+    }
+  }
+
+  test("dense rank") {
+    val tblNm = "src2"
+    withTable(tblNm) {
+      spark.range(20).toDF("id").selectExpr(s"1 as col1",
+          "collate(case when rand() < 0.5 then 'a' else 'A' end, 'UTF8_LCASE') as col2")
+        .write.format("parquet").mode("overwrite").saveAsTable(tblNm)
+
+      spark.table(tblNm)
+        .select(dense_rank().over(orderBy("col2")).as(s"_rank_0"))
+        .show()
+      checkAnswer(spark.sql(s"SELECT COUNT(*) FROM $tblNm"), Row(20))
+    }
+  }
+
+  test("having group by is aware of session collation") {
+    val tableName = "testcat.tbl_grp_by"
+    withSQLConf(SqlApiConf.DEFAULT_COLLATION -> "UTF8_LCASE") {
+      withTable(tableName) {
+
+        sql(s"CREATE TABLE $tableName (c1 STRING COLLATE UTF8_BINARY) USING parquet")
+        sql(s"INSERT INTO $tableName VALUES ('a'), ('A')")
+
+        // having clause uses session collation
+        checkAnswer(
+          sql(s"SELECT COUNT(*) FROM $tableName GROUP BY c1 HAVING 'a' = 'A'"),
+          Seq(Row(1), Row(1)))
+
+        // having clause uses column collation
+        checkAnswer(
+          sql(s"SELECT COUNT(*) FROM $tableName GROUP BY c1 HAVING c1 = 'A'"),
+          Seq(Row(1)))
+      }
+    }
   }
 }

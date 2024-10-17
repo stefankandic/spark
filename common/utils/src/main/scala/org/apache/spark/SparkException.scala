@@ -458,6 +458,8 @@ private[spark] class SparkRuntimeException private(
     )
   }
 
+  def this(errorClass: String) = this(errorClass, Map.empty[String, String])
+
   override def getMessageParameters: java.util.Map[String, String] = messageParameters.asJava
 
   override def getErrorClass: String = errorClass.orNull

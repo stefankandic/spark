@@ -18,7 +18,7 @@
 package org.apache.spark.sql.internal.types
 
 import org.apache.spark.sql.internal.SqlApiConf
-import org.apache.spark.sql.types.{AbstractDataType, DataType, StringType}
+import org.apache.spark.sql.types.{AbstractDataType, DataType, IndeterminateStringType, StringType}
 
 /**
  * AbstractStringType is an abstract class for StringType with collation support.
@@ -58,6 +58,70 @@ case object StringTypeWithCaseAccentSensitivity extends AbstractStringType {
  * CS_AI collation types.
  */
 case object StringTypeNonCSAICollation extends AbstractStringType {
-  override private[sql] def acceptsType(other: DataType): Boolean =
-    other.isInstanceOf[StringType] && other.asInstanceOf[StringType].isNonCSAI
+  override private[sql] def acceptsType(other: DataType): Boolean = {
+    true
+//    other.isInstanceOf[StringType] && other.asInstanceOf[StringType].isNonCSAI
+  }
+}
+
+case class MyAbstractStringType(collationType: CollationType, supportsIndeterminate: Boolean)
+  extends AbstractDataType {
+
+  override private[sql] def defaultConcreteType: DataType = SqlApiConf.get.defaultStringType
+  override private[sql] def simpleString: String = "string"
+
+  override private[sql] def acceptsType(other: DataType): Boolean = {
+    other match {
+      case IndeterminateStringType => supportsIndeterminate
+      case StringType => collationType.acceptsType(other.asInstanceOf[StringType])
+      case _ => false
+    }
+  }
+}
+
+sealed trait CollationType {
+  def acceptsType(other: StringType): Boolean
+}
+
+object CollationType {
+
+  /**
+   * Use for expressions supporting only binary collation.
+   */
+  case object BinaryType extends CollationType {
+    override def acceptsType(other: StringType): Boolean = other.supportsBinaryEquality
+  }
+
+  /**
+   * Use for expressions supporting only binary and lowercase collation.
+   */
+  case object BinaryAndLowercaseType extends CollationType {
+    override def acceptsType(other: StringType): Boolean =
+      other.supportsBinaryEquality || other.isUTF8LcaseCollation
+  }
+
+  /**
+   * Use for expressions supporting all collation types (binary
+   * and ICU) but limited to using case and accent sensitivity specifiers.
+   */
+  case class ConfigurableCollationType(
+      supportsCaseSpecifier: Boolean = true,
+      supportsAccentSpecifier: Boolean = true,
+      supportsTrimSpecifier: Boolean = false)
+    extends CollationType {
+    override def acceptsType(other: StringType): Boolean = {
+      (supportsCaseSpecifier || !other.isCaseInsensitive) &&
+        (supportsAccentSpecifier || !other.isAccentInsensitive) &&
+        (supportsTrimSpecifier || !other.usesTrim)
+    }
+  }
+
+  /**
+   * Use for expressions supporting all possible collation types except
+   * CS_AI collation types.
+   */
+  case object NonCaseSensitiveAccentInsensitiveType extends CollationType {
+    override def acceptsType(other: StringType): Boolean =
+      !other.isCaseInsensitive && other.isAccentInsensitive
+  }
 }

@@ -19,7 +19,7 @@ package org.apache.spark.sql.types
 
 import org.json4s.JsonAST.{JString, JValue}
 
-import org.apache.spark.annotation.Stable
+import org.apache.spark.annotation.{Evolving, Stable}
 import org.apache.spark.sql.catalyst.util.CollationFactory
 
 /**
@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.util.CollationFactory
  *   The id of collation for this StringType.
  */
 @Stable
-class StringType private (val collationId: Int) extends AtomicType with Serializable {
+class StringType private[sql] (val collationId: Int) extends AtomicType with Serializable {
 
   /**
    * Support for Binary Equality implies that strings are considered equal only if they are byte
@@ -44,8 +44,14 @@ class StringType private (val collationId: Int) extends AtomicType with Serializ
   private[sql] def supportsLowercaseEquality: Boolean =
     CollationFactory.fetchCollation(collationId).supportsLowercaseEquality
 
-  private[sql] def isNonCSAI: Boolean =
-    !CollationFactory.isCaseSensitiveAndAccentInsensitive(collationId)
+  private[sql] def isCaseInsensitive: Boolean =
+    CollationFactory.isCaseInsensitive(collationId)
+
+  private[sql] def isAccentInsensitive: Boolean =
+    CollationFactory.isAccentInsensitive(collationId)
+
+  private[sql] def usesTrim: Boolean =
+    CollationFactory.usesTrimCollation(collationId)
 
   private[sql] def isUTF8BinaryCollation: Boolean =
     collationId == CollationFactory.UTF8_BINARY_COLLATION_ID
@@ -69,6 +75,7 @@ class StringType private (val collationId: Int) extends AtomicType with Serializ
    */
   override def typeName: String =
     if (isUTF8BinaryCollation) "string"
+    else if (collationId == -1) "indeterminate collation"
     else s"string collate ${CollationFactory.fetchCollation(collationId).collationName}"
 
   // Due to backwards compatibility and compatibility with other readers
@@ -102,4 +109,11 @@ case object StringType extends StringType(0) {
     val collationId = CollationFactory.collationNameToId(collation)
     new StringType(collationId)
   }
+}
+
+@Evolving
+case object IndeterminateStringType
+  extends StringType(CollationFactory.INDETERMINATE_COLLATION_ID) {
+
+  override def typeName: String = "indeterminate collation"
 }
