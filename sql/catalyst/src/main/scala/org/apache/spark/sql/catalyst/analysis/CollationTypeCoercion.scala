@@ -136,7 +136,7 @@ object CollationTypeCoercion {
     case getMap @ GetMapValue(child, key) if getMap.keyType != key.dataType =>
       key match {
         case Literal(_, _: StringType) =>
-          GetMapValue(child, Cast(key, getMap.keyType))
+          GetMapValue(child, castStringType(key, getMap.keyType.asInstanceOf[StringType]))
         case _ =>
           getMap
       }
@@ -185,7 +185,8 @@ object CollationTypeCoercion {
    * if expression has StringType in the first place.
    */
   def castStringType(expr: Expression, st: StringType): Expression = {
-    castStringType(expr.dataType, st)
+    val newst = if (st == StringType) StringType(0) else st
+    castStringType(expr.dataType, newst)
       .map(dt => Cast(expr, dt))
       .getOrElse(expr)
   }

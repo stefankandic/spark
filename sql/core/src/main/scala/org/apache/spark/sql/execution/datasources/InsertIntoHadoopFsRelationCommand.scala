@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogTable, CatalogT
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils._
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, V1WritePlan}
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.errors.{QueryCompilationErrors, QueryExecutionErrors}
 import org.apache.spark.sql.execution.SparkPlan
@@ -58,7 +58,7 @@ case class InsertIntoHadoopFsRelationCommand(
     fileIndex: Option[FileIndex],
     outputColumnNames: Seq[String],
     isCtas: Boolean)
-  extends V1WriteCommand {
+  extends V1WriteCommand with V1WritePlan {
 
   private lazy val parameters = CaseInsensitiveMap(options)
 

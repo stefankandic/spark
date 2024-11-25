@@ -66,6 +66,7 @@ class PlanChangeLogger[TreeType <: TreeNode[_]] extends Logging {
         }
 
         logBasedOnLevel(message())
+//        println(message().message)
       }
     }
   }
