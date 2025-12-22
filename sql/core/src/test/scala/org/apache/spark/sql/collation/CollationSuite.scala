@@ -305,6 +305,23 @@ class CollationSuite extends DatasourceV2SQLBase with AdaptiveSparkPlanHelper {
     // scalastyle:on nonascii
   }
 
+  test("naw join") {
+    withTable("t1", "t2") {
+      sql(s"create table t1 (c1 string collate utf8_lcase)")
+      sql(s"create table t2 (c1 string collate utf8_lcase)")
+      sql(s"insert into t1 values ('a')")
+      sql(s"insert into t2 values ('A')")
+
+      withSQLConf("spark.sql.autoBroadcastJoinThreshold" -> "-1",
+        "spark.sql.join.preferSortMergeJoin" -> "true") {
+        checkAnswer(
+          sql("select * from t1 where c1 not in (select c1 from t2)"),
+          Seq.empty
+        )
+      }
+    }
+  }
+
   test("equality check respects collation") {
     Seq(
       ("utf8_binary", "aaa", "AAA", false),

@@ -25,10 +25,12 @@ import org.apache.spark.sql.catalyst.expressions.codegen._
 import org.apache.spark.sql.catalyst.optimizer.{BuildLeft, BuildRight, BuildSide}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
+import org.apache.spark.sql.catalyst.util.UnsafeRowUtils
 import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.{CodegenSupport, ExplainUtils, RowIterator}
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.apache.spark.sql.types.{BooleanType, DataType, IntegralType, LongType}
+import org.apache.spark.sql.types._
+import org.apache.spark.util.ArrayImplicits.SparkArrayOps
 
 /**
  * @param relationTerm variable name for HashedRelation
@@ -735,8 +737,14 @@ object HashJoin extends CastSupport with SQLConfHelper {
    *
    * If not, returns the original expressions.
    */
-  def rewriteKeyExpr(keys: Seq[Expression]): Seq[Expression] = {
-    assert(keys.nonEmpty)
+  def rewriteKeyExpr(keys2: Seq[Expression]): Seq[Expression] = {
+    assert(keys2.nonEmpty)
+
+    // First apply collation key rewrite for non-binary-stable keys
+    val keys = keys2.map { key =>
+      processExpressionForCollation(key, key.dataType)
+    }
+
     if (!canRewriteAsLongType(keys)) {
       return keys
     }
@@ -752,6 +760,51 @@ object HashJoin extends CastSupport with SQLConfHelper {
         BitwiseAnd(cast(e, LongType), Literal((1L << bits) - 1)))
     }
     keyExpr :: Nil
+  }
+
+  private def processExpressionForCollation(expr: Expression, dt: DataType): Expression = {
+    dt match {
+      // For binary stable expressions, no special handling is needed.
+      case _ if UnsafeRowUtils.isBinaryStable(dt) =>
+        expr
+
+      // Inject CollationKey for non-binary collated strings.
+      case _: StringType =>
+        CollationKey(expr)
+
+      // Recursively process struct fields for non-binary structs.
+      case StructType(fields) =>
+        processStruct(expr, fields)
+
+      // Recursively process array elements for non-binary arrays.
+      case ArrayType(et, containsNull) =>
+        processArray(expr, et, containsNull)
+
+      // Joins are not supported on maps, so there's no special handling for MapType.
+      case _ =>
+        expr
+    }
+  }
+
+  private def processStruct(str: Expression, fields: Array[StructField]): Expression = {
+    val struct = CreateNamedStruct(fields.zipWithIndex.flatMap { case (f, i) =>
+      Seq(Literal(f.name), processExpressionForCollation(GetStructField(str, i, Some(f.name)), f.dataType))
+    }.toImmutableArraySeq)
+    if (str.nullable) {
+      If(IsNull(str), Literal(null, struct.dataType), struct)
+    } else {
+      struct
+    }
+  }
+
+  private def processArray(arr: Expression, et: DataType, containsNull: Boolean): Expression = {
+    val param: NamedExpression = NamedLambdaVariable("a", et, containsNull)
+    val funcBody: Expression = processExpressionForCollation(param, et)
+    if (!funcBody.fastEquals(param)) {
+      ArrayTransform(arr, LambdaFunction(funcBody, Seq(param)))
+    } else {
+      arr
+    }
   }
 
   /**
